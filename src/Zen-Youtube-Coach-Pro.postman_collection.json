@@ -1,0 +1,132 @@
+{
+  "info": {
+    "name": "Zen YouTube Coach Pro",
+    "_postman_id": "b7af9a24-8a91-4bf6-96e8-zen-coach-pro",
+    "description": "Collezione ufficiale per testare tutte le API del backend Zen YouTube Coach Pro.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Test Server",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "http://localhost:3000/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": [""]
+        }
+      }
+    },
+    {
+      "name": "/analyze — Singolo video",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"id\": \"VIDEO_ID\",\n  \"title\": \"Titolo del video\",\n  \"description\": \"Descrizione...\",\n  \"thumbnail\": \"https://...\",\n  \"views\": 12345,\n  \"likes\": 345,\n  \"comments\": 67\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/analyze",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["analyze"]
+        }
+      }
+    },
+    {
+      "name": "/compare — Confronto video",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"videos\": [\n    { \"id\": \"AAA\", \"title\": \"Video 1\", \"views\": 1000 },\n    { \"id\": \"BBB\", \"title\": \"Video 2\", \"views\": 3000 }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/compare",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["compare"]
+        }
+      }
+    },
+    {
+      "name": "/pattern — Pattern generale da 5 video",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"videos\": [\n    { \"title\": \"Video 1\", \"description\": \"...\" },\n    { \"title\": \"Video 2\", \"description\": \"...\" },\n    { \"title\": \"Video 3\", \"description\": \"...\" },\n    { \"title\": \"Video 4\", \"description\": \"...\" },\n    { \"title\": \"Video 5\", \"description\": \"...\" }\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/pattern",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["pattern"]
+        }
+      }
+    },
+    {
+      "name": "/pattern/zen — Pattern adattato al tuo canale",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"pattern\": { \"patternSummary\": \"...\", \"idealVideoBlueprint\": {} }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/pattern/zen",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["pattern", "zen"]
+        }
+      }
+    },
+    {
+      "name": "/pattern/suggest-next-video — Generatore video automatico",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"zenPattern\": { \"zenPatternSummary\": \"...\", \"zenIdealVideoBlueprint\": {} }\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/pattern/suggest-next-video",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["pattern", "suggest-next-video"]
+        }
+      }
+    },
+    {
+      "name": "/trend-scan — Scansione trend competitor",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"channels\": [\n    \"https://www.youtube.com/@ViviVitale\",\n    \"https://www.youtube.com/@BenessereSegreto\"\n  ]\n}"
+        },
+        "url": {
+          "raw": "http://localhost:3000/trend-scan",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["trend-scan"]
+        }
+      }
+    }
+  ]
+}

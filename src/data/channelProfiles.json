@@ -1,0 +1,17 @@
+[
+  {
+    "handle": "@ZenSaluteBenessere",
+    "channelName": "Zen Salute e Benessere",
+    "niche": "Alimentazione sana, movimento, prevenzione, benessere over 50/60/70",
+    "targetAges": ["Over 50", "Over 60", "Over 70"],
+    "toneOfVoice": "Calmo, rassicurante, empatico, autorevole ma semplice",
+    "psychologyDrivers": ["Fiducia", "Prevenzione", "Serenità", "Autonomia", "Longevità"],
+    "contentPillars": [
+      "Alimentazione anti-infiammazione",
+      "Rimedi naturali validati",
+      "Mobilità e movimento leggero",
+      "Cuore, sonno, articolazioni",
+      "Longevità e vita attiva"
+    ]
+  }
+]

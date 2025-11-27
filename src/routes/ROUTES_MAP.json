@@ -1,0 +1,207 @@
+{
+  "app": "Zen YouTube Coach Pro",
+  "version": "3.0",
+  "description": "Mappa completa delle API del backend (modello Enterprise).",
+  "routes": [
+    {
+      "route": "/transcript",
+      "method": "POST",
+      "task": "Transcript Extraction",
+      "body": {
+        "videoUrl": "https://youtu.be/XXXXXXXXXXX"
+      },
+      "returns": ["text", "segments", "provider"]
+    },
+
+    {
+      "route": "/video-info",
+      "method": "POST",
+      "task": "Video Metadata Extraction",
+      "body": { "videoUrl": "..." },
+      "returns": ["title", "description", "durationSec", "thumbnailHD", "tags"]
+    },
+
+    {
+      "route": "/analyze-transcript",
+      "method": "POST",
+      "task": "Transcript Analysis",
+      "aiTask": "analyze-transcript",
+      "body": {
+        "transcript": "string",
+        "audience": "over60",
+        "forceProvider": "auto"
+      },
+      "returns": [
+        "diagnosiGenerale",
+        "hookSuggeriti",
+        "titleIdeas",
+        "strutturaNarrativa",
+        "thumbnailConcepts"
+      ]
+    },
+
+    {
+      "route": "/compare-transcript",
+      "method": "POST",
+      "task": "Transcript Comparison",
+      "aiTask": "compare-videos",
+      "body": {
+        "videoA": { "transcript": "..." },
+        "videoB": { "transcript": "..." }
+      },
+      "returns": [
+        "vincitoreGenerale",
+        "confrontoHook",
+        "confrontoStrutturaNarrativa",
+        "ideeHookIbrido"
+      ]
+    },
+
+    {
+      "route": "/compare-videos",
+      "method": "POST",
+      "task": "Video-to-Video Analysis",
+      "aiTask": "compare-videos",
+      "body": {
+        "videoA": { "title": "..." },
+        "videoB": { "title": "..." }
+      },
+      "returns": [
+        "vincitoreGenerale",
+        "dettaglioTitolo",
+        "dettaglioThumbnail",
+        "ideaTitoloIbrido"
+      ]
+    },
+
+    {
+      "route": "/trend-scan",
+      "method": "POST",
+      "task": "Trend Generator",
+      "aiTask": "trend-scan",
+      "body": {
+        "niche": "salute e benessere",
+        "audience": "over60"
+      },
+      "returns": [
+        "trendPrincipali",
+        "ideeVideo",
+        "angoliPNL"
+      ]
+    },
+
+    {
+      "route": "/trend-deepsearch",
+      "method": "POST",
+      "task": "Trend Deep Analysis",
+      "aiTask": "trend-deepsearch",
+      "returns": [
+        "trendEmergenti",
+        "mapCompetitor",
+        "gapDiMercato",
+        "videoConsigliati"
+      ]
+    },
+
+    {
+      "route": "/title-opt",
+      "method": "POST",
+      "task": "Title Optimization",
+      "aiTask": "title-opt",
+      "returns": ["varianti", "versioneMigliore"]
+    },
+
+    {
+      "route": "/thumbnail-ideas",
+      "method": "POST",
+      "task": "Thumbnail Concepts Generator",
+      "aiTask": "thumbnail-opt",
+      "returns": ["testiSovraimpressi", "visualConcepts", "psicologia"]
+    },
+
+    {
+      "route": "/retention-analyze",
+      "method": "POST",
+      "task": "Retention Analyzer",
+      "aiTask": "retention",
+      "returns": ["puntiCritici", "momentiForti", "riscrittureSuggerite"]
+    },
+
+    {
+      "route": "/script-from-video",
+      "method": "POST",
+      "task": "Video to Script Transformation",
+      "aiTask": "script-drafting",
+      "returns": ["hook", "script", "sezioni", "cta"]
+    },
+
+    {
+      "route": "/video-summary",
+      "method": "POST",
+      "task": "Video Summary",
+      "aiTask": "summary",
+      "returns": ["riassunto", "puntiChiave", "takeaway"]
+    },
+
+    {
+      "route": "/hook-generator",
+      "method": "POST",
+      "task": "Hook Generator",
+      "aiTask": "hook",
+      "returns": ["hooks"]
+    },
+
+    {
+      "route": "/outline-generator",
+      "method": "POST",
+      "task": "Outline Builder",
+      "aiTask": "outline",
+      "returns": ["hookIniziale", "sezioni", "ctaFinale"]
+    },
+
+    {
+      "route": "/shorts-generator",
+      "method": "POST",
+      "task": "Shorts Script Generator",
+      "aiTask": "shorts",
+      "returns": ["shorts"]
+    },
+
+    {
+      "route": "/keyword-research",
+      "method": "POST",
+      "task": "Keyword Intelligence",
+      "aiTask": "keyword-research",
+      "returns": [
+        "keywordPrincipale",
+        "keywordSecondarie",
+        "longTail",
+        "ideeTagYouTube"
+      ]
+    },
+
+    {
+      "route": "/dropoff-explain",
+      "method": "POST",
+      "task": "Drop-off Explanation",
+      "aiTask": "dropoff-explain",
+      "returns": ["analisiDropoff", "lineeGuidaGenerali"]
+    },
+
+    {
+      "route": "/description-opt",
+      "method": "POST",
+      "task": "Description Optimization",
+      "aiTask": "description-opt",
+      "returns": ["descrizioneOttimizzata", "bulletPuntiChiave", "callToAction"]
+    },
+
+    {
+      "route": "/hashtag-opt",
+      "method": "POST",
+      "task": "Hashtag Optimization",
+      "aiTask": "hashtag-opt",
+      "returns": ["hashtagYouTube", "hashtagShorts", "mixConsigliato"]
+    }
+  ]
+}
