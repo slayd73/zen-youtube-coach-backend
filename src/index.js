@@ -17,32 +17,28 @@ const app = express();
 app.use(express.json({ limit: "60mb" }));
 app.use(cors());
 
+// ---------------------------------------------
 // IMPORT ROUTES
+// ---------------------------------------------
 import healthRoute from "./routes/health.js";
 import transcriptRoute from "./routes/transcript.js";
 import analyzeRoute from "./routes/analyze-transcript.js";
 import compareVideosRoute from "./routes/compare-videos.js";
 import trendDeepRoute from "./routes/trend-deepsearch.js";
 
-// USE ROUTES
+// ---------------------------------------------
+// HEALTH PRIMA DI TUTTO (Priority Route)
+// ---------------------------------------------
 app.use("/health", healthRoute);
 app.use("/healthz", healthRoute);
 
+// ---------------------------------------------
+// TUTTE LE ALTRE API
+// ---------------------------------------------
 app.use("/transcript", transcriptRoute);
 app.use("/analyze", analyzeRoute);
 app.use("/compare-videos", compareVideosRoute);
 app.use("/trend-deepsearch", trendDeepRoute);
-
-// tutte le altre API
-app.use("/transcript", transcriptRoute);
-app.use("/analyze", analyzeRoute);
-app.use("/compare-videos", compareVideosRoute);
-app.use("/trend-deepsearch", trendDeepRoute);
-
-// Global fallback per /health/*
-app.get("/health/*", (req, res) => {
-  res.json({ status: "OK", note: "Wildcard health route" });
-});
 
 // ---------------------------------------------
 // Render PORT Fix
