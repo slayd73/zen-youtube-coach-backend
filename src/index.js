@@ -27,8 +27,9 @@ import compareVideosRoute from "./routes/compare-videos.js";
 import trendDeepRoute from "./routes/trend-deepsearch.js";
 
 // ---------------------------------------------
-// HEALTH PRIMA DI TUTTO (Priority Route)
+// HEALTH PRIMA DI TUTTO (PRIORITÀ ASSOLUTA)
 // ---------------------------------------------
+// 👉 Queste 2 route DEVONO venire prima di tutte le altre
 app.use("/health", healthRoute);
 app.use("/healthz", healthRoute);
 
@@ -41,13 +42,13 @@ app.use("/compare-videos", compareVideosRoute);
 app.use("/trend-deepsearch", trendDeepRoute);
 
 // ---------------------------------------------
-// Render PORT Fix
+// PORTA PER RENDER (OBBLIGATORIA)
 // ---------------------------------------------
 const PORT = process.env.PORT || 4000;
 const HOST = "0.0.0.0";
 
 // ---------------------------------------------
-// START
+// SERVER START
 // ---------------------------------------------
 app.listen(PORT, HOST, () => {
   console.log("============================================");
