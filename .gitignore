@@ -1,5 +1,65 @@
+# =========================================================
+# SLAYD / ZEN BACKEND — .gitignore (Windows + Node)
+# =========================================================
+
+# --- deps / build ---
 node_modules/
+dist/
+build/
+coverage/
+
+# --- runtime / tmp / cache ---
+.tmp/
+tmp/
+out/
+cache/
+exports/
+*.log
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- ENV (SECRETS) ---
 .env
 .env.*
-.env.key
-*.log
+!.env.example
+
+# =========================================================
+# LOCAL ARTIFACTS / TEST OUTPUTS (your repo is full of these)
+# =========================================================
+
+# JSON/TXT dumps from curl/tests/tools
+out*.json
+body*.json
+headers*.txt
+minutes_out*.txt
+response.json
+payload.json
+diagnose.json
+wow*.json
+t*.json
+*.txt
+
+# CSV exports/tests
+*.csv
+
+# random files that ended up created locally
+curl
+findstr
+
+# =========================================================
+# BACKUPS / COPIES / BAK (Windows copies everywhere)
+# =========================================================
+**/*Copia*
+**/*.bak*
+**/*.back*
+src/_backup/
+
+# =========================================================
+# EXTRACTOR FOLDER — keep tools, ignore outputs/backups
+# =========================================================
+ESTRATTORE DI CODICE IN UNICO TXT/**/extracted_code.txt
+ESTRATTORE DI CODICE IN UNICO TXT/**/paths.txt.bak
+ESTRATTORE DI CODICE IN UNICO TXT/**/BCK/
+ESTRATTORE DI CODICE IN UNICO TXT/**/BCK/**
