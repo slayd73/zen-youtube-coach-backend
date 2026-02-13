@@ -63,3 +63,7 @@ ESTRATTORE DI CODICE IN UNICO TXT/**/extracted_code.txt
 ESTRATTORE DI CODICE IN UNICO TXT/**/paths.txt.bak
 ESTRATTORE DI CODICE IN UNICO TXT/**/BCK/
 ESTRATTORE DI CODICE IN UNICO TXT/**/BCK/**
+# --- junk files without extension ---
+220
+{
+clearTimeout(timer))
