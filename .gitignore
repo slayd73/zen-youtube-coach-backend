@@ -69,3 +69,6 @@ ESTRATTORE DI CODICE IN UNICO TXT/**/BCK/**
 clearTimeout(timer))
 # extractor output (do not version)
 ESTRATTORE DI CODICE IN UNICO TXT/**/extracted_code.txt
+# local outputs
+fliki_out.json
+bin/
