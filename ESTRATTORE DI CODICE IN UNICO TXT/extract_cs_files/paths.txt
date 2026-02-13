@@ -1,6 +1,42 @@
-C:\Users\christian.SYSTEMA\OneDrive\Immagini\SALUTE E BENESSERE\NUOVI VIDEO FLIKI\YOUTUBE COACH PRO DA ATTIVARE\APPLICAZIONE GITHUB\zen-youtube-coach-backend, js, json, jsx
-C:\Users\christian.SYSTEMA\OneDrive\Immagini\SALUTE E BENESSERE\NUOVI VIDEO FLIKI\YOUTUBE COACH PRO DA ATTIVARE\APPLICAZIONE GITHUB\zen-youtube-coach-backend\node_modules, none
-C:\Users\christian.SYSTEMA\0000 PROGETTO ZEN COACH CHRY\zen-youtube-coach-dashboard, jsx, css, html, json, js 
-C:\Users\christian.SYSTEMA\0000 PROGETTO ZEN COACH CHRY\zen-youtube-coach-dashboard\node_modules, none
-C:\Users\christian.SYSTEMA\Documents\ZenTranscriptEngine, js, json, 
-C:\Users\christian.SYSTEMA\Documents\ZenTranscriptEngine\node_modules, none
+# =========================================================
+# PATHS.TXT — Creator Intelligence Pro snapshot
+# Formato righe:
+#   INCLUDE: <path>, js, jsx, ts, tsx, ...
+#   EXCLUDE: <path>, none
+# =========================================================
+
+# -------------------------
+# BACKEND (include)
+# -------------------------
+C:\DEV\zen-youtube-coach-backend, js, mjs, cjs, json, md, css, yml, yaml
+
+# BACKEND (exclude)
+C:\DEV\zen-youtube-coach-backend\node_modules, none
+C:\DEV\zen-youtube-coach-backend\.git, none
+C:\DEV\zen-youtube-coach-backend\dist, none
+C:\DEV\zen-youtube-coach-backend\build, none
+C:\DEV\zen-youtube-coach-backend\coverage, none
+C:\DEV\zen-youtube-coach-backend\.cache, none
+C:\DEV\zen-youtube-coach-backend\.venv, none
+
+# -------------------------
+# FRONTEND DASHBOARD (include)
+# -------------------------
+C:\DEV\zen-youtube-coach-dashboard, js, jsx, ts, tsx, json, md, css, yml, yaml
+
+# FRONTEND (exclude)
+C:\DEV\zen-youtube-coach-dashboard\node_modules, none
+C:\DEV\zen-youtube-coach-dashboard\.git, none
+C:\DEV\zen-youtube-coach-dashboard\dist, none
+C:\DEV\zen-youtube-coach-dashboard\build, none
+C:\DEV\zen-youtube-coach-dashboard\.cache, none
+
+# ZenTranscriptEngine (include)
+C:\DEV\ZenTranscriptEngine, js, mjs, cjs, json, md, yml, yaml, py, txt
+
+# ZenTranscriptEngine (exclude)
+C:\DEV\ZenTranscriptEngine\node_modules, none
+C:\DEV\ZenTranscriptEngine\.git, none
+C:\DEV\ZenTranscriptEngine\youtube-cookies.json, none
+C:\DEV\ZenTranscriptEngine\youtube-session.json, none
+C:\DEV\ZenTranscriptEngine\youtube-cookies.json.old, none

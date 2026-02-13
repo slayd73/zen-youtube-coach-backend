@@ -1,266 +1,254 @@
 import os
-import datetime
-import pathlib # Added for path manipulation in is_excluded
+import sys
+from datetime import datetime
+from typing import List, Set, Tuple
 
-# --- Configuration ---
-PATHS_FILE_NAME = "paths.txt"
-OUTPUT_FILE_NAME = "extracted_code.txt"
-# Folders to exclude (case-insensitive checking will be done)
-# We will check if any directory name in a file's path is EQUAL to one of these (after converting to lowercase)
-EXCLUDE_FOLDERS_EXACT = {".vs", "obj", "properties"} # Use a set of lowercase strings
-# --- End Configuration ---
 
-def is_excluded(file_path):
-    """
-    Checks if the file_path should be excluded based on EXCLUDE_FOLDERS_EXACT.
-    It checks if any directory component in the file_path matches an excluded folder name (case-insensitive).
-    """
-    path_obj = pathlib.Path(file_path)
-    # Iterate over all directory parts of the path
-    # path_obj.parts might be ('C:', 'Users', 'name', 'file.txt') or ('/', 'home', 'user', 'file.txt')
-    # We are interested in 'Users', 'name' etc. not the drive letter or root '/' or the filename itself.
-    for part in path_obj.parts[:-1]: # All parts of the path except the filename itself
-        if part.lower() in EXCLUDE_FOLDERS_EXACT:
+# ------------------------------------------------------------
+# extract_cs_files.py (Windows-friendly)
+#
+# Uso da CMD:
+#   python extract_cs_files.py paths.txt
+#   python extract_cs_files.py paths.txt output.txt
+#
+# Uso con doppio click:
+#   - cerca paths.txt nella stessa cartella dello script
+#   - genera extracted_code.txt nella stessa cartella
+#   - mostra errori e resta aperto (PAUSE)
+#
+# paths.txt format:
+#   - Commenti: righe vuote o che iniziano con #
+#   - Include:
+#       C:\DEV\project, js, jsx, ts, tsx, json
+#   - Exclude:
+#       C:\DEV\project\node_modules, none
+# ------------------------------------------------------------
+
+
+def script_dir() -> str:
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def normalize_path(p: str) -> str:
+    p = p.strip().strip('"').strip("'")
+    return os.path.normpath(p)
+
+
+def resolve_paths_file(arg_paths: str | None) -> str:
+    if arg_paths:
+        p = normalize_path(arg_paths)
+        if not os.path.isabs(p):
+            p = os.path.join(script_dir(), p)
+        return p
+    return os.path.join(script_dir(), "paths.txt")
+
+
+def resolve_output_file(arg_out: str | None) -> str:
+    if arg_out:
+        out = normalize_path(arg_out)
+        if not os.path.isabs(out):
+            out = os.path.join(script_dir(), out)
+        return out
+    return os.path.join(script_dir(), "extracted_code.txt")
+
+
+def parse_paths_file(paths_file: str) -> Tuple[List[Tuple[str, Set[str]]], Set[str]]:
+    includes: List[Tuple[str, Set[str]]] = []
+    excludes: Set[str] = set()
+
+    with open(paths_file, "r", encoding="utf-8", errors="replace") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line or line.startswith("#"):
+                continue
+
+            parts = [p.strip() for p in line.split(",")]
+            if len(parts) < 2:
+                continue
+
+            root = normalize_path(parts[0])
+            tokens = [t.strip().lower() for t in parts[1:] if t.strip()]
+
+            if len(tokens) == 1 and tokens[0] == "none":
+                excludes.add(root)
+                continue
+
+            exts: Set[str] = set()
+            for t in tokens:
+                t = t.lstrip(".").lower()
+                if t and t != "none":
+                    exts.add(t)
+
+            if exts:
+                includes.append((root, exts))
+
+    return includes, excludes
+
+
+def is_excluded(path: str, excludes: Set[str]) -> bool:
+    norm = normalize_path(path)
+    for ex in excludes:
+        exn = normalize_path(ex)
+        if norm.lower() == exn.lower():
+            return True
+        if norm.lower().startswith((exn + os.sep).lower()):
             return True
     return False
 
-def main():
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    paths_file_full_path = os.path.join(script_dir, PATHS_FILE_NAME)
-    output_file_full_path = os.path.join(script_dir, OUTPUT_FILE_NAME)
 
-    if not os.path.exists(paths_file_full_path):
-        print(f"ERROR: Input file '{PATHS_FILE_NAME}' not found in script directory:\n{script_dir}")
-        return
+def try_read_text(file_path: str) -> str:
+    # utf-8
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception:
+        pass
 
-    file_paths_to_extract = []
-    projects_to_scan = []  # List of dicts: {'path': str, 'extensions': set} for directory scanning
-    project_roots_for_header_set = set() # Unique project roots or parent dirs of direct files for output header
-    # NEW: Set to store absolute paths that should be completely excluded.
-    excluded_paths_from_none = set()
+    # cp1252
+    try:
+        with open(file_path, "r", encoding="cp1252", errors="replace") as f:
+            return f.read()
+    except Exception:
+        pass
 
-    print("Reading paths and target extensions from:", paths_file_full_path)
-    with open(paths_file_full_path, 'r', encoding='utf-8') as pf:
-        for line_num, line_content in enumerate(pf, 1):
-            stripped_line = line_content.strip()
-            if not stripped_line:  # Skip empty lines
+    # latin-1 fallback
+    with open(file_path, "r", encoding="latin-1", errors="replace") as f:
+        return f.read()
+
+
+def collect_files(includes: List[Tuple[str, Set[str]]], excludes: Set[str]) -> List[str]:
+    collected: List[str] = []
+    seen: Set[str] = set()
+
+    for root, exts in includes:
+        root = normalize_path(root)
+        if not os.path.exists(root):
+            continue
+
+        if os.path.isfile(root):
+            if is_excluded(root, excludes):
+                continue
+            ext = os.path.splitext(root)[1].lstrip(".").lower()
+            if ext in exts:
+                rp = os.path.abspath(root)
+                if rp not in seen:
+                    seen.add(rp)
+                    collected.append(rp)
+            continue
+
+        for dirpath, dirnames, filenames in os.walk(root):
+            if is_excluded(dirpath, excludes):
+                dirnames[:] = []
                 continue
 
-            parts = [p.strip() for p in stripped_line.split(',')]
-            project_path_raw = parts[0]
-            
-            if not project_path_raw: # Path part is empty
-                print(f"WARNING: Empty path on line {line_num} in '{PATHS_FILE_NAME}'. Skipping...")
-                continue
+            pruned = []
+            for d in dirnames:
+                full = os.path.join(dirpath, d)
+                if not is_excluded(full, excludes):
+                    pruned.append(d)
+            dirnames[:] = pruned
 
-            project_path_normalized = os.path.abspath(project_path_raw)
-            
-            # NEW: Check for the "none" exclusion keyword first.
-            specified_ext_keywords = [kw.lower() for kw in parts[1:]]
-            if "none" in specified_ext_keywords:
-                if os.path.exists(project_path_normalized):
-                    print(f"  Exclusion rule found: Path '{project_path_normalized}' and its contents will be excluded.")
-                    excluded_paths_from_none.add(project_path_normalized)
-                else:
-                    # Still add the rule even if path doesn't exist, in case it's a pattern for a generated path
-                    print(f"  Exclusion rule found for non-existent path: '{project_path_normalized}'. Rule will be applied.")
-                    excluded_paths_from_none.add(project_path_normalized)
-                continue # This line's purpose is exclusion, so we're done with it.
+            for fn in filenames:
+                fp = os.path.join(dirpath, fn)
+                if is_excluded(fp, excludes):
+                    continue
+                ext = os.path.splitext(fn)[1].lstrip(".").lower()
+                if ext in exts:
+                    rp = os.path.abspath(fp)
+                    if rp not in seen:
+                        seen.add(rp)
+                        collected.append(rp)
 
-
-            if os.path.isdir(project_path_normalized):
-                project_roots_for_header_set.add(project_path_normalized)
-                current_extensions = set()
-                # parts[0] is the path, parts[1:] are the extension keywords
-                # specified_ext_keywords was already calculated above
-
-                if not specified_ext_keywords: # Only path was given (e.g., "C:\MyProject")
-                    current_extensions.add(".cs") # Default to .cs
-                else:
-                    has_valid_keyword = False
-                    for ext_keyword in specified_ext_keywords:
-                        if ext_keyword:  # Ensure keyword is not an empty string
-                            current_extensions.add("." + ext_keyword) # Prepend dot
-                            has_valid_keyword = True
-                    
-                    if not has_valid_keyword:
-                        # All specified keywords were empty (e.g., "path, ,,")
-                        print(f"WARNING: Directory path '{project_path_raw}' (line {line_num}) had extension specifiers "
-                              f"({', '.join(parts[1:])}), but all were empty after processing. "
-                              "No files will be searched in this directory for this line's configuration.")
-                
-                if current_extensions: # Only add to scan if there are extensions to look for
-                    projects_to_scan.append({'path': project_path_normalized, 'extensions': current_extensions})
-
-            elif os.path.isfile(project_path_normalized):
-                # This is a direct file path
-                parent_dir = os.path.dirname(project_path_normalized)
-                project_roots_for_header_set.add(parent_dir) # Add parent dir for header grouping
-
-                # Check extensions if provided for this specific file
-                # Filter out empty strings from parts[1:] that might result from "path, , ext"
-                raw_ext_keywords_for_file = [kw for kw in parts[1:] if kw] 
-                
-                should_add_file = False
-                if not raw_ext_keywords_for_file:
-                    # No extension keywords specified for this file (e.g. "path/file.txt" or "path/file.txt,,")
-                    # -> include the file by default
-                    should_add_file = True
-                else:
-                    # Extension keywords were specified. File's extension must match one of them.
-                    file_actual_ext_lower_with_dot = os.path.splitext(project_path_normalized.lower())[1]
-                    target_extensions_for_file = {"." + kw.lower() for kw in raw_ext_keywords_for_file}
-
-                    if file_actual_ext_lower_with_dot in target_extensions_for_file:
-                        should_add_file = True
-                    else:
-                        print(f"INFO: Direct file '{project_path_raw}' (line {line_num}) with extension '{file_actual_ext_lower_with_dot}' "
-                              f"skipped. It does not match specified target extensions: {', '.join(sorted(list(target_extensions_for_file)))}.")
-                
-                if should_add_file:
-                    if not is_excluded(project_path_normalized):
-                        file_paths_to_extract.append(project_path_normalized)
-                        print(f"  Will extract (direct file): {project_path_normalized}")
-                    else:
-                        print(f"  Skipping excluded direct file (path contains excluded folder name): {project_path_normalized}")
-            
-            else: # Not a directory and not a file
-                print(f"WARNING: Path not found or not a valid file/directory: '{project_path_raw}' (from line {line_num}). Skipping...")
-                continue
-
-    # Sort directory scan list for consistent processing order
-    projects_to_scan.sort(key=lambda p: p['path'])
-    
-    # Prepare sorted lists of root paths for header and grouping
-    # For displaying in the output file's initial header (alphabetical)
-    header_display_roots = sorted(list(project_roots_for_header_set))
-    # For grouping files under project root headers (longest path first, then alphabetical for tie-break)
-    grouping_roots = sorted(list(project_roots_for_header_set), key=lambda p: (-len(os.path.normpath(p)), os.path.normpath(p)))
-
-    # --- Process directories specified in projects_to_scan ---
-    for proj_spec in projects_to_scan:
-        project_path = proj_spec['path']
-        allowed_extensions = proj_spec['extensions']
-
-        if not allowed_extensions: # Should have been caught by warning and not added if empty
-            continue 
-        
-        print(f"--- Processing Project Directory: '{project_path}' for extensions: {', '.join(sorted(list(allowed_extensions)))} ---")
-
-        for root, dirs, files in os.walk(project_path, topdown=True):
-            # NEW: Check if the current directory (root) is under a path marked with "none".
-            norm_root = os.path.normpath(root)
-            is_root_excluded_by_none = False
-            for excluded_path in excluded_paths_from_none:
-                norm_excluded_path = os.path.normpath(excluded_path)
-                if norm_root == norm_excluded_path or norm_root.startswith(norm_excluded_path + os.sep):
-                    is_root_excluded_by_none = True
-                    break
-            
-            if is_root_excluded_by_none:
-                print(f"  Skipping excluded directory and its contents (rule: 'none'): {root}")
-                dirs[:] = []  # Prune subdirectories from os.walk
-                continue      # Skip processing files in this root
-
-            # Filter directories in-place to prevent traversing into excluded ones
-            dirs[:] = [d for d in dirs if d.lower() not in EXCLUDE_FOLDERS_EXACT]
-
-            for file in files:
-                file_ext_lower = os.path.splitext(file.lower())[1]
-                if file_ext_lower in allowed_extensions:
-                    file_full_path = os.path.join(root, file)
-                    # is_excluded checks the full path components, redundant if dirs[:] already pruned, but good for safety.
-                    if not is_excluded(file_full_path):
-                        file_paths_to_extract.append(file_full_path)
-                        print(f"  Will extract: {file_full_path}")
-                    # else: # Optional: print if a file found by walk is excluded by path component
-                    #    print(f"  Skipping excluded file (found by walk, path component): {file_full_path}")
+    collected.sort(key=lambda p: p.lower())
+    return collected
 
 
-    # Sort all collected file paths for consistent output order
-    file_paths_to_extract.sort()
+def write_output(output_path: str, files: List[str], includes: List[Tuple[str, Set[str]]], excludes: Set[str]) -> None:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    out_dir = os.path.dirname(os.path.abspath(output_path))
+    os.makedirs(out_dir, exist_ok=True)
 
-    # NEW: Final filtering pass to remove any files that fall under a 'none' exclusion rule.
-    # This handles direct file paths and is a final safeguard.
-    final_file_paths = []
-    for file_path in file_paths_to_extract:
-        is_file_excluded_by_none = False
-        norm_file_path = os.path.normpath(file_path)
-        for excluded_path in excluded_paths_from_none:
-            norm_excluded_path = os.path.normpath(excluded_path)
-            if norm_file_path == norm_excluded_path or norm_file_path.startswith(norm_excluded_path + os.sep):
-                is_file_excluded_by_none = True
-                print(f"  Filtering out file due to 'none' exclusion rule: {file_path}")
-                break
-        if not is_file_excluded_by_none:
-            final_file_paths.append(file_path)
-    
-    file_paths_to_extract = final_file_paths
+    with open(output_path, "w", encoding="utf-8", newline="\n") as out:
+        out.write("# =========================================================\n")
+        out.write("# EXTRACTED CODE — single TXT snapshot\n")
+        out.write(f"# Generated at: {now}\n")
+        out.write(f"# Output: {output_path}\n")
+        out.write("# =========================================================\n\n")
 
+        out.write("# -------------------------\n# INCLUDES\n# -------------------------\n")
+        for root, exts in includes:
+            out.write(f"- {normalize_path(root)}  ({', '.join(sorted(exts))})\n")
 
-    print(f"\nWriting extracted code to: {output_file_full_path}")
-    with open(output_file_full_path, 'w', encoding='utf-8') as out_f:
-        out_f.write(f"Python Script: {os.path.basename(__file__)}\n")
-        out_f.write(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        out_f.write(f"Source Paths File: {paths_file_full_path}\n")
-        # Optionally, list the processed roots:
-        if header_display_roots:
-            out_f.write("Processed Roots (Directories from paths.txt or Parent Directories of files from paths.txt):\n")
-            for r_path in header_display_roots:
-                out_f.write(f"- {r_path}\n")
-        out_f.write("========================================\n\n")
+        out.write("\n# -------------------------\n# EXCLUDES\n# -------------------------\n")
+        for ex in sorted(excludes, key=lambda x: x.lower()):
+            out.write(f"- {normalize_path(ex)}\n")
 
-        if not project_roots_for_header_set and not file_paths_to_extract: # No valid paths processed at all
-             out_f.write("No project paths or direct files were processed from paths.txt (or all were invalid/empty).\n")
-        elif not file_paths_to_extract: # Roots were processed, but no files matched
-             out_f.write(f"Processed paths from '{PATHS_FILE_NAME}' but found no files matching the criteria.\n")
+        out.write("\n# -------------------------\n")
+        out.write(f"# FILES EXTRACTED: {len(files)}\n")
+        out.write("# -------------------------\n\n")
 
+        for i, fp in enumerate(files, start=1):
+            out.write("\n\n")
+            out.write("/* ======================================================== */\n")
+            out.write(f"/* [{i}/{len(files)}] FILE: {fp} */\n")
+            out.write("/* ======================================================== */\n\n")
 
-        last_project_root_written = None
-
-        for extracted_file_path in file_paths_to_extract:
-            current_project_root = ""
-            # Find the project root this file belongs to from the list of roots we processed (sorted by length desc)
-            for pr_header_path in grouping_roots:
-                # Check if the file path starts with the project root path.
-                # Add os.sep to ensure it's a directory match, not partial name.
-                # os.path.normpath ensures consistent separators for comparison
-                norm_extracted_path = os.path.normpath(extracted_file_path)
-                norm_pr_header_path = os.path.normpath(pr_header_path)
-
-                if norm_extracted_path.startswith(norm_pr_header_path + os.sep) or \
-                   os.path.dirname(norm_extracted_path) == norm_pr_header_path : # for files directly in root
-                    current_project_root = pr_header_path # Use original pr_header_path for display
-                    break
-            
-            if current_project_root and current_project_root != last_project_root_written:
-                out_f.write(f"\n--- Files from Project Root: {current_project_root} ---\n\n")
-                last_project_root_written = current_project_root
-            elif not current_project_root and last_project_root_written is None and grouping_roots:
-                # Fallback if a file's root isn't perfectly matched but we have roots
-                out_f.write(f"\n--- Files from Uncategorized Project Root (check paths.txt and script logic) ---\n\n")
-                last_project_root_written = "UNCATEGORIZED" # Prevent this header from repeating
-
-            out_f.write(f"// ==================================================\n")
-            out_f.write(f"// FILE: {extracted_file_path}\n")
-            out_f.write(f"// ==================================================\n\n")
             try:
-                with open(extracted_file_path, 'r', encoding='utf-8', errors='replace') as f_content:
-                    out_f.write(f_content.read())
-                out_f.write("\n\n")
+                content = try_read_text(fp)
             except Exception as e:
-                out_f.write(f"// ERROR: Could not read file. Reason: {e}\n\n")
-                print(f"    WARNING: Error reading file '{extracted_file_path}'. Reason: {e}")
-    
-    # Final console messages
-    if not project_roots_for_header_set: # No valid entries in paths.txt
-        print(f"No valid project paths or direct files were found in '{PATHS_FILE_NAME}'. "
-              f"Output file '{OUTPUT_FILE_NAME}' may only contain a basic header.")
-    elif not file_paths_to_extract: # Valid paths/roots, but no files matched criteria
-        print(f"Processed paths from '{PATHS_FILE_NAME}' but found no files matching the extraction criteria. "
-              f"Output file '{OUTPUT_FILE_NAME}' written with header and relevant messages.")
-    else: # Files were extracted
-        print(f"Extraction complete. Output written to '{OUTPUT_FILE_NAME}'.")
+                out.write(f"/* ERROR reading file: {e} */\n")
+                continue
+
+            out.write(content)
+
+        out.write("\n\n# ================= END OF EXTRACT =================\n")
+
+
+def pause_if_doubleclick():
+    # Se lanciato da Explorer, è comodo fermarsi sempre alla fine.
+    # Da CMD non dà fastidio: basta premere Invio.
+    try:
+        input("\nPremi INVIO per chiudere...")
+    except Exception:
+        pass
+
+
+def main():
+    # Double click: nessun argomento -> usa defaults
+    arg_paths = sys.argv[1] if len(sys.argv) >= 2 else None
+    arg_out = sys.argv[2] if len(sys.argv) >= 3 else None
+
+    paths_file = resolve_paths_file(arg_paths)
+    output_file = resolve_output_file(arg_out)
+
+    if not os.path.exists(paths_file):
+        print(f"❌ paths.txt non trovato: {paths_file}")
+        print("Suggerimento: metti paths.txt nella stessa cartella di questo script.")
+        pause_if_doubleclick()
+        sys.exit(1)
+
+    includes, excludes = parse_paths_file(paths_file)
+    if not includes:
+        print("❌ Nessuna regola INCLUDE trovata in paths.txt.")
+        print("Formato INCLUDE: C:\\DEV\\project, js, jsx, ts, tsx")
+        pause_if_doubleclick()
+        sys.exit(1)
+
+    files = collect_files(includes, excludes)
+    write_output(output_file, files, includes, excludes)
+
+    print(f"✅ OK. Estratti {len(files)} file.")
+    print(f"📄 Output: {output_file}")
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        print(f"\n❌ ERRORE: {e}")
+        pause_if_doubleclick()
+        raise
+    else:
+        # anche in caso di successo, se è doppio click è comodo vedere l’output
+        if len(sys.argv) == 1:
+            pause_if_doubleclick()
