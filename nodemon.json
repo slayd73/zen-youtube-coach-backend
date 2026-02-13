@@ -1,0 +1,14 @@
+{
+  "watch": ["src"],
+  "ext": "js,mjs,cjs,json",
+  "ignore": [
+    "node_modules/**",
+    "**/*.csv",
+    "**/*.txt",
+    "**/*.log",
+    "tmp/**",
+    "output/**",
+    "exports/**",
+    "public/**"
+  ]
+}

@@ -8,9 +8,9 @@
       "method": "POST",
       "task": "Transcript Extraction",
       "body": {
-        "videoUrl": "https://youtu.be/XXXXXXXXXXX"
+        "url": "https://youtu.be/XXXXXXXXXXX"
       },
-      "returns": ["text", "segments", "provider"]
+      "returns": ["success", "videoId", "transcript", "length"]
     },
 
     {
@@ -80,13 +80,15 @@
       "task": "Trend Generator",
       "aiTask": "trend-scan",
       "body": {
-        "niche": "salute e benessere",
-        "audience": "over60"
+        "query": "salute e benessere",
+        "audience": "over60",
+        "depth": "standard|deep"
       },
       "returns": [
         "trendPrincipali",
-        "ideeVideo",
-        "angoliPNL"
+        "formatiCheFunzionano",
+        "ideeVideoLunghi",
+        "ideeShorts"
       ]
     },
 

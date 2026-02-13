@@ -1,0 +1,51 @@
+{
+  "version": "slides-v1",
+  "language": "it",
+  "introWindowSeconds": 30,
+
+  "microNarration": {
+    "enabled": true,
+    "maxSentences": 3,
+    "mustDescribeViewerProblem": true,
+    "mustBeSimple": true
+  },
+
+  "hook": {
+    "enabled": true,
+    "mustBeNarrative": true,
+    "mustBeClearAndStrong": true,
+    "mustStateBenefitExplicitly": true,
+    "noVaguePromises": true
+  },
+
+  "structure": {
+    "order": ["microNarrationOrQuestion", "hookPromise", "brandOrContext"],
+    "clarityBeatsSuspense": true
+  },
+
+  "antiPatterns": {
+    "bannedOpeningPhrases": [
+      "ciao a tutti",
+      "ciao ragazzi",
+      "benvenuti",
+      "oggi parliamo di",
+      "in questo video",
+      "oggi vediamo",
+      "mi chiamo"
+    ],
+    "bannedVaguePhrases": [
+      "scoprirai qualcosa",
+      "rimarrai sorpreso",
+      "cose incredibili",
+      "non crederai",
+      "ti svelo un segreto",
+      "rimani fino alla fine e vedrai"
+    ]
+  },
+
+  "brand": {
+    "channelName": "Zen Salute e Benessere",
+    "brandMentionMaxSeconds": 12,
+    "brandMustNotComeBeforeHook": true
+  }
+}

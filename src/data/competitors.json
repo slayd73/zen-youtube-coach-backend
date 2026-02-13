@@ -1,0 +1,6 @@
+{
+  "competitors": [
+    { "name": "Competitor A", "url": "https://youtube.com/@..." },
+    { "name": "Competitor B", "url": "https://youtube.com/@..." }
+  ]
+}

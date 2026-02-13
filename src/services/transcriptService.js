@@ -1,1 +1,440 @@
-// ======================================================================// 🎧 transcriptService.js — V6 Ultra-Premium 2025//// Pipeline definitiva per Zen YouTube Coach Pro://// PRIORITÀ:// 1) manualTranscript (incollato da te, dall'estensione, da YouTube, ecc.)// 2) YouTube TimedText (sottotitoli ufficiali)// 3) Proxy esterno (YT_TRANSCRIPT_PROXY_URL) se esiste// 4) YouTube Summary API esterna (YT_SUMMARY_API_URL) se esiste// 5) "Summary interno" via AI su titolo+descrizione// 6) Scraper HTML + noembed per contesto// 7) AI Transcript Rebuild + AI Cleanup// 8) Fallback testuale (mai più errori duri)//// Tutto viene cache-ato in memoria per videoId.// ======================================================================import dotenv from "dotenv";import { callAIModel } from "./aiEngine.js";dotenv.config();// Cache in memoria (chiave: videoId normalizzato)const transcriptCache = new Map();// ======================================================================// 🔧 Normalizzazione ID / URL YouTube// ======================================================================function normalizeVideoId(input) {  if (!input) return null;  let v = String(input).trim();  // Se non è URL, lo considero un ID grezzo e ripulisco da parametri  if (!v.startsWith("http")) {    if (v.includes("&")) v = v.split("&")[0];    if (v.includes("?")) v = v.split("?")[0];    return v;  }  try {    // Tieni solo il primo parametro di query    if (v.includes("?")) {      const [base, q] = v.split("?");      v = `${base}?${q.split("&")[0]}`;    }    const url = new URL(v);    // youtu.be/VIDEOID    if (url.hostname.includes("youtu.be")) {      let id = url.pathname.replace("/", "");      if (id.includes("?")) id = id.split("?")[0];      if (id.includes("&")) id = id.split("&")[0];      return id;    }    // youtube.com/watch?v=VIDEOID    if (url.hostname.includes("youtube.com")) {      let id = url.searchParams.get("v");      if (!id) return null;      if (id.includes("&")) id = id.split("&")[0];      if (id.includes("?")) id = id.split("?")[0];      return id;    }  } catch {    if (v.includes("&")) v = v.split("&")[0];    if (v.includes("?")) v = v.split("?")[0];    return v;  }  if (v.includes("&")) v = v.split("&")[0];  if (v.includes("?")) v = v.split("?")[0];  return v;}// ======================================================================// 🔧 TimedText YouTube → testo continuo// ======================================================================function vttToPlainText(raw) {  if (!raw) return "";  const lines = raw.replace(/\r/g, "").split("\n").map((l) => l.trim());  const clean = lines.filter((line) => {    if (!line) return false;    if (/^\d+$/.test(line)) return false;                // sequenza numerica    if (line.includes("-->")) return false;              // timestamp    if (/^(WEBVTT|Kind:|Language:)/i.test(line)) return false;    return true;  });  return clean.join(" ").replace(/\s+/g, " ").trim();}async function fetchTimedText(videoId, lang) {  const url = `https://www.youtube.com/api/timedtext?lang=${lang}&v=${videoId}&fmt=vtt`;  try {    const res = await fetch(url);    if (!res.ok) return null;    return await res.text();  } catch {    return null;  }}async function tryTimedText(videoId, debug = false) {  const langs = (process.env.TRANSCRIPT_LANGS || "it,en")    .split(",")    .map((x) => x.trim())    .filter(Boolean);  for (const lang of langs) {    if (debug) console.log(`🔎 TimedText → ${videoId} [${lang}]`);    const raw = await fetchTimedText(videoId, lang);    if (!raw) continue;    const plain = vttToPlainText(raw);    if (plain && plain.length > 50) {      if (debug) console.log(`✅ TimedText OK (${lang})`);      return { provider: `youtube-timedtext-${lang}`, plain };    }  }  return null;}// ======================================================================// 🔧 Proxy esterno (es. tuo micro-servizio transcript)// ======================================================================async function tryProxy(videoId, debug = false) {  const base = process.env.YT_TRANSCRIPT_PROXY_URL;  if (!base) return null;  const url = `${base}?v=${encodeURIComponent(videoId)}`;  try {    if (debug) console.log(`🔎 Proxy transcript → ${url}`);    const res = await fetch(url);    if (!res.ok) return null;    const data = await res.json().catch(() => null);    if (!data) return null;    const t = data.continuousText || data.text || "";    if (!t || t.trim().length < 50) return null;    if (debug) console.log("✅ Proxy transcript OK");    return { provider: "proxy", plain: t.trim() };  } catch {    return null;  }}// ======================================================================// 🔧 YouTube Summary API esterna (YT_SUMMARY_API_URL)//    Questa è la parte che può usare “YouTube Summary” o simili,//    via un tuo endpoint intermedio.// ======================================================================async function trySummaryApi(videoId, debug = false) {  const base = process.env.YT_SUMMARY_API_URL;  if (!base) return null;  const url = `${base}?videoId=${encodeURIComponent(videoId)}`;  try {    if (debug) console.log(`🔎 Summary API → ${url}`);    const res = await fetch(url);    if (!res.ok) return null;    const data = await res.json().catch(() => null);    if (!data) return null;    let summary = "";    if (typeof data.summary === "string") summary = data.summary;    else if (typeof data.text === "string") summary = data.text;    else if (Array.isArray(data.bullets)) summary = data.bullets.join(" ");    else if (Array.isArray(data.sentences)) summary = data.sentences.join(" ");    if (!summary || summary.trim().length < 30) return null;    if (debug) console.log("✅ Summary API OK");    return summary.trim();  } catch {    return null;  }}// ======================================================================// 🔧 Scraper HTML YouTube + noembed// ======================================================================async function fetchNoembed(videoId) {  try {    const url = `https://noembed.com/embed?url=https://www.youtube.com/watch?v=${videoId}`;    const res = await fetch(url);    if (!res.ok) return null;    return await res.json();  } catch {    return null;  }}function extractDesc(html) {  if (!html) return null;  // shortDescription nello script JSON  const j = html.match(/"shortDescription":"(.*?)"/s);  if (j && j[1]) {    return j[1]      .replace(/\\n/g, " ")      .replace(/\\r/g, " ")      .replace(/\\"/g, '"')      .replace(/\\\\/g, "\\")      .trim();  }  // meta description  const m = html.match(/<meta\s+name="description"\s+content="([^"]*)"/i);  if (m && m[1]) return m[1].trim();  return null;}function extractTitle(html) {  if (!html) return null;  const m = html.match(/<title>(.*?)<\/title>/i);  if (m && m[1]) {    return m[1].replace(/\s+-\s+YouTube$/i, "").trim();  }  return null;}async function fetchHtml(videoId) {  try {    const url = `https://www.youtube.com/watch?v=${videoId}`;    const res = await fetch(url);    if (!res.ok) return null;    return await res.text();  } catch {    return null;  }}async function scrapeContext(videoId, debug = false) {  const [noembed, html] = await Promise.all([    fetchNoembed(videoId),    fetchHtml(videoId),  ]);  const title =    (noembed && noembed.title) ||    (html && extractTitle(html)) ||    null;  const author = (noembed && noembed.author_name) || null;  const description = html ? extractDesc(html) : null;  const htmlSnippet = html ? html.slice(0, 8000) : null;  if (debug) {    console.log("🔍 SCRAPER CONTEXT:", {      title,      author,      descPreview: description ? description.slice(0, 100) : null,    });  }  return { title, author, description, htmlSnippet };}// ======================================================================// 🔧 Summary interno via AI (tipo "YouTube Summary" interno)// ======================================================================async function trySummaryInternal(videoId, debug = false) {  const ctx = await scrapeContext(videoId, debug);  const { title, description } = ctx;  if (!title && !description) return null;  const systemPrompt =    "Riassumi in 10-15 frasi brevi e chiare il probabile contenuto di questo video YouTube, basandoti su titolo e descrizione. Non inventare cose assurde, ma sii verosimile.";  const userPrompt = `Titolo: ${title || "(non disponibile)"}Descrizione:${description || "(nessuna descrizione)"}`.trim();  try {    if (debug) console.log("🧠 Summary interno: chiamata modello...");    const aiRaw = await callAIModel({      model: process.env.AI_SUMMARY_MODEL || "gpt-4o-mini",      temperature: 0.4,      maxTokens: 1500,      systemPrompt,      userPrompt,    });    const txt = String(      typeof aiRaw === "string" ? aiRaw : aiRaw?.content || aiRaw?.text || ""    ).trim();    if (!txt || txt.length < 50) return null;    if (debug) console.log("✅ Summary interno OK (len:", txt.length, ")");    return txt;  } catch {    return null;  }}// ======================================================================// 🔧 AI Transcript Rebuild (con contesto + summary)// ======================================================================async function rebuildTranscript(videoId, ctx, summary, debug = false) {  const systemPrompt = `Sei un assistente che ricostruisce transcript verosimili di video YouTubeper analisi strategiche. Usa tutti i dati disponibili (titolo, autore, descrizione,summary testuale, snippet HTML) per creare un transcript continuo, naturale, plausibile,in italiano se possibile. Non scrivere commenti, solo il testo del transcript.`.trim();  const parts = [];  parts.push(`Video ID: ${videoId}`);  if (ctx?.title) parts.push(`Titolo: ${ctx.title}`);  if (ctx?.author) parts.push(`Autore/Canale: ${ctx.author}`);  if (ctx?.description) parts.push(`Descrizione YouTube:\n${ctx.description}`);  if (summary) parts.push(`Riassunto disponibile:\n${summary}`);  if (ctx?.htmlSnippet) parts.push(`Snippet HTML (estratto dalla pagina YouTube):\n${ctx.htmlSnippet}`);  parts.push("Ricostruisci il possibile transcript parlato del video, con frasi complete e scorrevoli.");  const userPrompt = parts.join("\n\n");  try {    if (debug) console.log("🧠 AI REBUILD: chiamata modello...");    const aiRaw = await callAIModel({      model: process.env.AI_TRANSCRIPT_REBUILD_MODEL || "gpt-4o-mini",      temperature: 0.5,      maxTokens: 6000,      systemPrompt,      userPrompt,    });    const txt = String(      typeof aiRaw === "string" ? aiRaw : aiRaw?.content || aiRaw?.text || ""    ).trim();    if (!txt || txt.length < 50) {      if (debug) console.log("⚠️ AI REBUILD ha prodotto testo corto/vuoto.");      return null;    }    if (debug) console.log("✅ AI REBUILD OK (len:", txt.length, ")");    return txt;  } catch {    return null;  }}// ======================================================================// 🔧 Fallback testuale generico (mai errori duri)// ======================================================================async function genericFallbackTranscript(videoId) {  return `Transcript non disponibile per il video ${videoId}. L'AI non è riuscita a ricostruire il parlato. Incolla manualmente la trascrizione da YouTube dentro Zen YouTube Coach Pro per analisi più accurate.`;}// ======================================================================// 🔧 AI Cleanup finale// ======================================================================async function cleanupTranscript(text) {  if (!text || text.length < 20) return null;  const systemPrompt = `Ripulisci questo transcript:- sistema la punteggiatura,- unisci frasi spezzate,- non aggiungere concetti nuovi,- non cambiare lingua.Rispondi solo con il testo pulito.`.trim();  const userPrompt = text;  try {    const aiRaw = await callAIModel({      model: process.env.AI_TRANSCRIPT_CLEAN_MODEL || "gpt-4o-mini",      temperature: 0.1,      maxTokens: 4000,      systemPrompt,      userPrompt,    });    const out = String(      typeof aiRaw === "string" ? aiRaw : aiRaw?.content || aiRaw?.text || ""    ).trim();    if (!out || out.length < 20) return null;    return out;  } catch {    return null;  }}// ======================================================================// 🧠 PIPELINE PRINCIPALE AUTOMATICA// ======================================================================async function resolvePipeline(videoId, options = {}) {  const debug = !!options.debug;  if (debug) console.log(`🚀 PIPELINE V6 → videoId = ${videoId}`);  // 1) TimedText  const timed = await tryTimedText(videoId, debug);  if (timed) {    const cleaned = await cleanupTranscript(timed.plain);    return { provider: timed.provider, text: cleaned || timed.plain };  }  // 2) Proxy  const proxy = await tryProxy(videoId, debug);  if (proxy) {    const cleaned = await cleanupTranscript(proxy.plain);    return { provider: proxy.provider, text: cleaned || proxy.plain };  }  // 3) Summary (manuale, API, interno)  let summary = null;  if (options.manualSummary && options.manualSummary.trim().length > 0) {    summary = options.manualSummary.trim();    if (debug) console.log("📝 Uso manualSummary fornito dall'utente.");  } else {    summary =      (await trySummaryApi(videoId, debug)) ||      (await trySummaryInternal(videoId, debug));  }  // 4) Scraper contesto + AI Rebuild  const ctx = await scrapeContext(videoId, debug);  const rebuilt = await rebuildTranscript(videoId, ctx, summary, debug);  if (rebuilt) {    const cleaned = await cleanupTranscript(rebuilt);    return {      provider: summary ? "ai-rebuild-with-summary" : "ai-rebuild",      text: cleaned || rebuilt,    };  }  // 5) Fallback generico (ma SEMPRE testo, mai errore duro)  const fallback = await genericFallbackTranscript(videoId);  return { provider: "fallback-generic", text: fallback };}// ======================================================================// 🟢 ENTRYPOINT PUBBLICO// ======================================================================//// getTranscript(videoIdOrUrl, {//   manualTranscript?: string,//   manualSummary?: string,//   forceRefresh?: boolean,//   debug?: boolean// })//// ======================================================================export async function getTranscript(videoIdOrUrl, options = {}) {  const {    manualTranscript,    manualSummary,    forceRefresh = false,    debug = false,  } = options;  const videoId = normalizeVideoId(videoIdOrUrl);  if (!videoId) {    return {      success: false,      error: true,      message: "videoId non valido.",    };  }  // 1) manualTranscript → PRIORITARIO (quello che incolli tu da YouTube)  if (manualTranscript && manualTranscript.trim().length > 20) {    const text = manualTranscript.trim();    const cleaned = await cleanupTranscript(text);    const final = cleaned || text;    const out = {      success: true,      error: false,      provider: "manual",      videoId,      continuousText: final,      aiText: cleaned || null,      timestamp: new Date().toISOString(),    };    transcriptCache.set(videoId, out);    return out;  }  // 2) Cache  if (!forceRefresh && transcriptCache.has(videoId)) {    return { ...transcriptCache.get(videoId), fromCache: true };  }  // 3) Pipeline automatica  const result = await resolvePipeline(videoId, { manualSummary, debug });  const out = {    success: true,    error: false,    provider: result.provider,    videoId,    continuousText: result.text,    aiText: null,    timestamp: new Date().toISOString(),  };  transcriptCache.set(videoId, out);  return out;}// Tools opzionaliexport function clearTranscriptCache() {  transcriptCache.clear();}export function getTranscriptCacheSize() {  return transcriptCache.size;}
+// backend/src/services/transcriptService.js
+// ============================================================
+// transcriptService.js — Wrapper per Transcript Engine (layered)
+// ✅ Propaga SEMPRE meta.attempts (trace/debug.attempts)
+// ✅ Mai [] "muto": se manca trace, aggiunge tentativo diagnostico
+// ✅ CACHE su disco: evita di rifare Whisper ogni volta
+// ✅ LOCK anti-concorrenza: evita doppia trascrizione parallela
+// ✅ Compatibile con 2 formati del layer:
+//    A) { success, provider, text, trace?, debug? }
+//    B) { ok, provider, text, kind, len, trace?, debug:{attempts} }
+// ============================================================
+
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import crypto from "crypto";
+
+import { getTranscript as layeredGetTranscript } from "./youtubeTranscriptService.js";
+
+// ------------------------------------------------------------
+// Config cache (disco)
+// ------------------------------------------------------------
+const CACHE_VERSION = "transcript-v1"; // cambia se cambi logica/prompt pipeline
+const CACHE_TTL_MS = 0; // 0 = infinito (consigliato)
+const LOCK_TTL_MS = 10 * 60 * 1000; // 10 min: se crasha, il lock scade
+
+function sha1(input) {
+  return crypto.createHash("sha1").update(input).digest("hex");
+}
+
+function safeMkdirSync(dir) {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+}
+
+function getCacheBaseDir() {
+  return path.join(process.cwd(), "cache", "transcripts");
+}
+
+function buildCacheKey({ videoId, lang }) {
+  return sha1(`${videoId}::${lang}::${CACHE_VERSION}`);
+}
+
+function getCacheDirForKey(key) {
+  return path.join(getCacheBaseDir(), key);
+}
+
+function extractYouTubeVideoId(videoIdOrUrl) {
+  if (!videoIdOrUrl) return null;
+  const s = String(videoIdOrUrl).trim();
+
+  // Se già sembra un videoId (11 char), lo accetto.
+  if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+
+  // youtu.be/<id>
+  let m = s.match(/youtu\.be\/([a-zA-Z0-9_-]{11})/);
+  if (m?.[1]) return m[1];
+
+  // watch?v=<id>
+  m = s.match(/[?&]v=([a-zA-Z0-9_-]{11})/);
+  if (m?.[1]) return m[1];
+
+  // shorts/<id>
+  m = s.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+  if (m?.[1]) return m[1];
+
+  // embed/<id>
+  m = s.match(/embed\/([a-zA-Z0-9_-]{11})/);
+  if (m?.[1]) return m[1];
+
+  return null;
+}
+
+async function readCache({ key, ttlMs = CACHE_TTL_MS }) {
+  const dir = getCacheDirForKey(key);
+  const metaPath = path.join(dir, "meta.json");
+  const txtPath = path.join(dir, "transcript.txt");
+
+  try {
+    const [metaRaw, txtRaw] = await Promise.all([
+      fsp.readFile(metaPath, "utf-8"),
+      fsp.readFile(txtPath, "utf-8"),
+    ]);
+
+    const meta = JSON.parse(metaRaw);
+
+    if (ttlMs > 0 && meta?.createdAt) {
+      const age = Date.now() - new Date(meta.createdAt).getTime();
+      if (age > ttlMs) return { hit: false, reason: "ttl_expired" };
+    }
+
+    const text = (txtRaw || "").trim();
+    if (text.length < 20) return { hit: false, reason: "empty_cache" };
+
+    return { hit: true, transcript: text, meta };
+  } catch {
+    return { hit: false, reason: "miss" };
+  }
+}
+
+async function writeCache({ key, transcript, meta = {} }) {
+  const dir = getCacheDirForKey(key);
+  safeMkdirSync(dir);
+
+  const metaPath = path.join(dir, "meta.json");
+  const txtPath = path.join(dir, "transcript.txt");
+
+  const outMeta = {
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    cacheVersion: CACHE_VERSION,
+    ...meta,
+  };
+
+  await Promise.all([
+    fsp.writeFile(txtPath, transcript ?? "", "utf-8"),
+    fsp.writeFile(metaPath, JSON.stringify(outMeta, null, 2), "utf-8"),
+  ]);
+
+  return { ok: true, dir };
+}
+
+async function withLock(key, fn) {
+  const dir = getCacheDirForKey(key);
+  safeMkdirSync(dir);
+
+  const lockPath = path.join(dir, ".lock");
+
+  // Se lock esiste ma è vecchio (crash), lo rimuoviamo
+  try {
+    const st = await fsp.stat(lockPath);
+    const age = Date.now() - st.mtimeMs;
+    if (age > LOCK_TTL_MS) {
+      await fsp.unlink(lockPath).catch(() => {});
+    }
+  } catch {
+    // no lock
+  }
+
+  // Crea lock atomico
+  try {
+    const fd = await fsp.open(lockPath, "wx");
+    await fd.writeFile(`${process.pid}\n${new Date().toISOString()}\n`, "utf-8");
+    await fd.close();
+  } catch {
+    return { locked: true, result: null };
+  }
+
+  try {
+    const result = await fn();
+    return { locked: false, result };
+  } finally {
+    await fsp.unlink(lockPath).catch(() => {});
+  }
+}
+
+// ------------------------------------------------------------
+// Attempts mapping: SEMPRE parlante
+// ------------------------------------------------------------
+function toAttempts(tr) {
+  const attempts = tr?.trace || tr?.debug?.attempts || [];
+
+  if (!Array.isArray(attempts) || attempts.length === 0) {
+    return [
+      {
+        method: "trace-missing",
+        error:
+          "Il Transcript Engine non ha restituito trace/attempts. " +
+          "Controlla youtubeTranscriptService.js: deve pushare attempts e ritornarli in trace o debug.attempts.",
+      },
+    ];
+  }
+
+  return attempts;
+}
+
+// ------------------------------------------------------------
+// Main API (compat legacy routes)
+// ------------------------------------------------------------
+export async function getTranscript(videoIdOrUrl, options = {}) {
+  const lang = options.lang || options.language || "it";
+  const debug = options.debug === true;
+
+  const videoId = extractYouTubeVideoId(videoIdOrUrl) || null;
+  const cacheKey = videoId ? buildCacheKey({ videoId, lang }) : null;
+
+  // 0) Cache HIT immediato (se ho videoId)
+  if (cacheKey) {
+    const cached = await readCache({ key: cacheKey, ttlMs: CACHE_TTL_MS });
+    if (cached.hit) {
+      const text = (cached.transcript || "").trim();
+      const attempts = [
+        {
+          method: "cache-hit",
+          ok: true,
+          info: `Cache transcript OK (key=${cacheKey})`,
+        },
+      ];
+
+      return {
+        success: true,
+        error: false,
+        provider: cached.meta?.provider || "cache",
+        kind: cached.meta?.kind || "captions_or_audio",
+        videoId: cached.meta?.videoId || videoId,
+        continuousText: text,
+        aiText: null,
+        timestamp: new Date().toISOString(),
+        meta: {
+          lang: cached.meta?.lang || lang,
+          len: text.length,
+          attempts,
+          cache: {
+            hit: true,
+            key: cacheKey,
+            dir: cached.meta?.cacheDir || `cache/transcripts/${cacheKey}`,
+            createdAt: cached.meta?.createdAt,
+          },
+        },
+      };
+    }
+  }
+
+  // 1) Se ho videoId, metto lock per evitare doppia Whisper parallela
+  if (cacheKey) {
+    const lockedRun = await withLock(cacheKey, async () => {
+      // Double-check cache dopo lock (caso raro)
+      const cached2 = await readCache({ key: cacheKey, ttlMs: CACHE_TTL_MS });
+      if (cached2.hit) {
+        const text2 = (cached2.transcript || "").trim();
+        return {
+          __fromCache: true,
+          payload: {
+            success: true,
+            error: false,
+            provider: cached2.meta?.provider || "cache",
+            kind: cached2.meta?.kind || "captions_or_audio",
+            videoId: cached2.meta?.videoId || videoId,
+            continuousText: text2,
+            aiText: null,
+            timestamp: new Date().toISOString(),
+            meta: {
+              lang: cached2.meta?.lang || lang,
+              len: text2.length,
+              attempts: [
+                { method: "cache-hit-after-lock", ok: true, info: "Cache OK" },
+              ],
+              cache: {
+                hit: true,
+                key: cacheKey,
+                dir: cached2.meta?.cacheDir || `cache/transcripts/${cacheKey}`,
+                createdAt: cached2.meta?.createdAt,
+              },
+            },
+          },
+        };
+      }
+
+      // 2) Pipeline reale (layered)
+      const tr = await layeredGetTranscript(videoIdOrUrl, { lang, debug });
+      const attempts = toAttempts(tr);
+
+      // Normalizzazione risultati layer
+      const isA = !!tr?.success;
+      const isB = !!tr?.ok;
+
+      const text = (tr?.text || "").trim();
+      const provider = tr?.provider || (isA || isB ? "unknown" : "none");
+      const kind = tr?.kind || "captions_or_audio";
+      const resolvedVideoId = tr?.debug?.videoId || videoId || null;
+
+      if (isA || isB) {
+        // SUCCESS
+        const payload = {
+          success: true,
+          error: false,
+          provider,
+          kind,
+          videoId: resolvedVideoId,
+          continuousText: text,
+          aiText: null,
+          timestamp: new Date().toISOString(),
+          meta: {
+            lang: tr?.lang || lang,
+            len: tr?.len || text.length,
+            attempts,
+            cache: {
+              hit: false,
+              key: cacheKey,
+              dir: `cache/transcripts/${cacheKey}`,
+            },
+          },
+        };
+
+        // Scrivo cache solo se testo è valido
+        if (text.length > 20) {
+          await writeCache({
+            key: cacheKey,
+            transcript: text,
+            meta: {
+              provider,
+              kind,
+              videoId: resolvedVideoId,
+              lang: tr?.lang || lang,
+              cacheDir: `cache/transcripts/${cacheKey}`,
+            },
+          });
+
+          // aggiungo attempt cache-write (non sovrascrivo i tuoi attempts)
+          payload.meta.attempts = [
+            ...attempts,
+            { method: "cache-write", ok: true, info: "Transcript salvato su cache" },
+          ];
+        } else {
+          payload.meta.attempts = [
+            ...attempts,
+            { method: "cache-skip", ok: false, error: "Testo troppo corto, cache non salvata" },
+          ];
+        }
+
+        return { __fromCache: false, payload };
+      }
+
+      // FAIL (ma con attempts parlanti)
+      const payloadFail = {
+        success: false,
+        error: true,
+        provider: provider || "none",
+        kind: tr?.kind || "none",
+        videoId: resolvedVideoId,
+        continuousText: "",
+        aiText: null,
+        timestamp: new Date().toISOString(),
+        meta: {
+          lang,
+          len: tr?.len || 0,
+          error_code: tr?.error_code || "NO_TRANSCRIPT",
+          error_message: tr?.error_message || "Transcript non disponibile",
+          attempts,
+          cache: {
+            hit: false,
+            key: cacheKey,
+            dir: `cache/transcripts/${cacheKey}`,
+          },
+        },
+      };
+
+      return { __fromCache: false, payload: payloadFail };
+    });
+
+    // Se c'è già una trascrizione in corso, non duplicare lavoro
+    if (lockedRun.locked) {
+      return {
+        success: false,
+        error: true,
+        provider: "lock",
+        kind: "none",
+        videoId: videoId,
+        continuousText: "",
+        aiText: null,
+        timestamp: new Date().toISOString(),
+        meta: {
+          lang,
+          len: 0,
+          error_code: "TRANSCRIPT_IN_PROGRESS",
+          error_message: "Trascrizione già in corso per questo video. Riprova tra poco.",
+          attempts: [
+            {
+              method: "lock",
+              ok: false,
+              error: "TRANSCRIPT_IN_PROGRESS",
+            },
+          ],
+          cache: {
+            hit: false,
+            key: cacheKey,
+            dir: `cache/transcripts/${cacheKey}`,
+          },
+        },
+      };
+    }
+
+    return lockedRun.result.payload;
+  }
+
+  // 3) Se NON riesco a estrarre videoId, fallback senza cache
+  const tr = await layeredGetTranscript(videoIdOrUrl, { lang, debug });
+  const attempts = toAttempts(tr);
+
+  if (tr?.success) {
+    const text = (tr.text || "").trim();
+    return {
+      success: true,
+      error: false,
+      provider: tr.provider || "unknown",
+      kind: tr.kind || "captions_or_audio",
+      videoId: tr?.debug?.videoId || null,
+      continuousText: text,
+      aiText: null,
+      timestamp: new Date().toISOString(),
+      meta: { lang, len: text.length, attempts },
+    };
+  }
+
+  if (tr?.ok) {
+    const text = (tr.text || "").trim();
+    return {
+      success: true,
+      error: false,
+      provider: tr.provider || "unknown",
+      kind: tr.kind || "captions_or_audio",
+      videoId: tr?.debug?.videoId || null,
+      continuousText: text,
+      aiText: null,
+      timestamp: new Date().toISOString(),
+      meta: {
+        lang: tr.lang || lang,
+        len: tr.len || text.length,
+        attempts,
+      },
+    };
+  }
+
+  return {
+    success: false,
+    error: true,
+    provider: tr?.provider || "none",
+    kind: tr?.kind || "none",
+    videoId: tr?.debug?.videoId || null,
+    continuousText: "",
+    aiText: null,
+    timestamp: new Date().toISOString(),
+    meta: {
+      lang,
+      len: tr?.len || 0,
+      error_code: tr?.error_code || "NO_TRANSCRIPT",
+      error_message: tr?.error_message || "Transcript non disponibile",
+      attempts,
+    },
+  };
+}

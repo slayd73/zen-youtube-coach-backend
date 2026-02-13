@@ -1,0 +1,17 @@
+{
+  "weekOf": "2026-01-01",
+  "ideas": [
+    {
+      "id": "vista-01",
+      "topic": "Vista",
+      "titleHook": "Vista stanca dopo i 60? Il segnale che molti ignorano",
+      "whyNow": ["Più schermi", "Inverno: luce artificiale", "Tema evergreen 60+"],
+      "angle": "Rassicurante + pratico: segnali quotidiani e cosa fare oggi",
+      "opportunity": 8,
+      "saturation": 4,
+      "seasonality": 7,
+      "competitorGap": true,
+      "preset": { "channelKey": "zen-salute", "targetMinutes": 10, "audience": "over60" }
+    }
+  ]
+}
