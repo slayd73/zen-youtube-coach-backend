@@ -67,3 +67,5 @@ ESTRATTORE DI CODICE IN UNICO TXT/**/BCK/**
 220
 {
 clearTimeout(timer))
+# extractor output (do not version)
+ESTRATTORE DI CODICE IN UNICO TXT/**/extracted_code.txt
