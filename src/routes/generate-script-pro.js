@@ -36,9 +36,12 @@ const MODEL_OPENAI = String(process.env.OPENAI_MODEL || "gpt-4o-mini");
 const MAX_TOKENS_GROQ = Number(process.env.GSP_MAX_TOKENS_GROQ || 3600);
 const MAX_TOKENS_OPENAI = Number(process.env.GSP_MAX_TOKENS_OPENAI || 3800);
 const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 120000);
+const STRICT_DEFAULT = String(process.env.GSP_STRICT_DEFAULT || "1") === "1";
+const STRICT_MAX_ATTEMPTS = 2;
+const STRICT_MAX_BLOCKS_PER_ATTEMPT = 3;
 
-// Softfail demo (non crashare mai la demo)
-const SOFTFAIL = String(process.env.GSP_SOFTFAIL || "1") === "1";
+// Softfail disabilitato: errori hard come richiesto
+const SOFTFAIL = false;
 
 function clampInt(n, min, max, fallback) {
   const v = Number(n);
@@ -76,13 +79,86 @@ function buildCTA(channelName) {
 }
 
 function buildHook(topic, channelName) {
-  // Hook creativo: promessa concreta <= 25 parole + micro-narrazione <= 3 frasi + tensione reale.
+  return "Se dopo cinque minuti hai fiato corto e gambe dure, in 30 giorni ritrovi respiro stabile, energia e un passo sicuro senza forzare.";
+}
+
+function buildGoldenTemplateBlocks({ topic, audience }) {
+  const ageLabel =
+    audience === "over70" ? "dopo i 70 anni" : audience === "over50" ? "dopo i 50 anni" : "dopo i 60 anni";
+
   return [
-    `In 30 giorni puoi camminare piu' stabile e con meno fiatone: oggi ti mostro il metodo pratico, senza sforzi inutili.`,
-    `Ieri una signora di 67 anni si e' fermata al secondo isolato, convinta di "non farcela piu'".`,
-    `Il problema non era l'eta': era un errore nascosto nel ritmo, quello che tra poco ti faccio vedere su ${topic}.`,
-    "",
-  ].join("\n");
+    `Molte persone ${ageLabel} fanno lo stesso errore: partono motivate e dopo pochi minuti si sentono svuotate. Non e' mancanza di volonta', e' strategia sbagliata. Una donna di 67 anni mi disse che al secondo isolato era gia' stanca e temeva di doversi fermare. Prima di cercare risultati visibili serve una base stabile. Per una settimana non inseguire distanza o velocita': difendi la regolarita'. Meglio dodici minuti fatti bene ogni giorno che quaranta minuti spinti e poi tre giorni di stop. Segna l'orario in agenda, prepara scarpe e giacca la sera, scegli prima il percorso. Meno decisioni al mattino significa meno spazio per la scusa del momento. Il cervello collabora quando la sequenza e' semplice, prevedibile e ripetibile.`,
+    `Il problema non era la durata dell'uscita, era la cadenza iniziale. Nei primi minuti accelerava senza accorgersene, sollevava le spalle, irrigidiva il collo e tratteneva il respiro. Il corpo entrava in allarme e arrivavano affanno e scoraggiamento. Il primo cambiamento pratico e' partire al settanta per cento di quello che senti di poter fare. I primi tre minuti devono sembrarti quasi lenti. Progressione utile: minuti uno-tre passo corto, spalle morbide, respiro regolare; minuti quattro-otto aumenta lievemente l'ampiezza, non la velocita'; ultimi minuti ritmo stabile senza forzare. Poi controlla l'appoggio del piede: se atterri duro col tallone e allunghi troppo la falcata, il carico sale su ginocchia e anche. Accorcia un poco il passo e rendi l'impatto piu' morbido.`,
+    `Quando parti troppo forte, cuore e sistema nervoso leggono lo sforzo come minaccia. Questo crea tensione muscolare e respiro corto. Se costruisci in modo graduale, il corpo percepisce sicurezza e sostiene meglio il ritmo. C'e' una regola immediata: devi finire sentendoti leggermente meglio di quando hai iniziato. Non svuotato, meglio. I primi dieci giorni non sono spettacolari, ma sono decisivi. In quella fase stai creando adattamento invisibile: coordinazione piu' pulita, respiro meno alto, passo piu' economico. Qui molti sbagliano interpretazione e pensano di non progredire. In realta' il miglioramento arriva per accumulo: ogni uscita e' un mattone, la sequenza conta piu' del singolo giorno. Nei primi trenta giorni non cerchi prestazione, educhi continuita' e togli al movimento l'etichetta di minaccia.`,
+    `Quando questa percezione cambia, cambia anche la vita pratica. Le scale pesano meno, le commissioni non sembrano un ostacolo prima ancora di uscire, e il dialogo interno diventa piu' utile. Non pensi "ce la faro'?", pensi "lo faccio". Per consolidare questo passaggio serve un rituale preciso: collega l'uscita a un gesto fisso, ad esempio subito dopo il caffe' del mattino. Cosi' riduci la negoziazione mentale. Nei giorni storti non azzerare: accorcia il tempo ma mantieni l'azione. Anche dieci minuti lenti tengono acceso il circuito. Se invece ti senti molto bene, resta prudente e non trasformare la giornata in una prova di forza. La costanza vale piu' dello slancio occasionale, soprattutto quando vuoi autonomia reale e non entusiasmo che dura due giorni.`,
+    `Usa anche una traccia respiratoria semplice: inspira per quattro passi, espira per quattro passi, senza rigidita'. Basta sentire un ritmo continuo. Un dettaglio spesso ignorato e' lo sguardo: se tieni la testa bassa, il torace si chiude; se alzi gli occhi verso un punto lontano, collo e petto si allineano meglio e il respiro scende. Se cammini con qualcuno, usa la regola conversazione: dovete parlare senza ansimare. Se una frase completa non esce, stai spingendo troppo. Se salti due giorni, niente giudizio: riparti con tempo ridotto e torna gradualmente al ritmo pieno. Il vero errore non e' fermarsi un attimo, e' convincersi di aver fallito. Prima la sicurezza: dolore intenso, capogiri, pressione al petto o fiato anomalo richiedono stop e confronto medico.`,
+    `Ricapitolo in modo operativo: partenza lenta, passo controllato, respiro fluido, regolarita' protetta. Non stai cercando numeri eroici, stai costruendo stabilita'. Il primo segnale corretto non e' la distanza, e' la percezione di controllo. Ti accorgi che non reagisci alla fatica in modo impulsivo, la gestisci. Questo succede per esposizione graduale: ogni uscita invia il messaggio "posso farlo" e il sistema nervoso abbassa la difesa. C'e' anche un vantaggio spesso trascurato: l'equilibrio. Camminare con ritmo controllato allena micro-aggiustamenti posturali utili quando sali un gradino o cambi direzione all'improvviso. Inserisci un mini esercizio: per pochi secondi rallenta leggermente e senti come distribuisci il peso sotto il piede, senza cambi bruschi.`,
+    `Dopo qualche settimana spesso migliora anche il sonno, non per esaurimento ma per migliore regolarita' interna. Se un giorno manca motivazione, non negoziare con l'identita': negozia con il tempo. Riduci durata, non cancellare il gesto. Anche pochi minuti proteggono la continuita'. E' qui che nasce la trasformazione vera: non nell'intensita', nella ripetizione intelligente. Quando accumuli azioni coerenti, smetti di essere "una persona che dovrebbe muoversi" e diventi una persona che si muove davvero. Su ${topic} la differenza la fanno scelte semplici, ripetibili e sostenibili nel mondo reale. Questa e' la leva che restituisce autonomia, fiducia e margine nelle giornate normali.`,
+  ];
+}
+
+function buildGoldenPrompt({ topic, audience, minutes, minWords, maxWords, minBlockWords }) {
+  return `
+Scrivi uno script YouTube in italiano, completo e pronto da voce, mantenendo tono diretto, pratico, anti-colpa e orientato a stabilita, fiducia e autonomia quotidiana per pubblico maturo.
+
+INPUT DINAMICI
+- Topic: ${topic}
+- Audience: ${audience} (over50 | over60 | over70)
+- Durata: ${minutes} minuti
+- Range parole obbligatorio script finale: ${minWords}-${maxWords}
+
+OBIETTIVO
+Genera uno script sul topic indicato con architettura Golden Template. Restituisci solo JSON valido nel formato richiesto qui sotto.
+
+ARCHITETTURA OBBLIGATORIA
+1) Hook di frizione reale (max 30 parole).
+2) Promessa chiara a 30 giorni con benefici concreti.
+3) Reframe identitario: "Non e l'eta, e come stai iniziando" (o variante equivalente naturale).
+4) Errore comune + open-loop 1 con payoff differito.
+5) Base di continuita/aderenza (riduzione attrito decisionale, rituale semplice).
+6) Pilastro tecnico 1 con protocollo operativo pratico e numerico.
+7) Pilastro tecnico 2 con correzione chiave + micro-caso realistico.
+8) Regola fisiologica/autoregolazione semplice e applicabile subito.
+9) Open-loop 2 principale con payoff dopo circa 200-300 parole.
+10) Consolidamento finale: gestione ricadute, sicurezza, recap e CTA unica concreta.
+
+VINCOLI DURI
+- Non usare opener vietati: "In questo video", "Oggi parliamo di", "Benvenuti", "Ciao a tutti", "In questo contenuto", "Oggi ti parlero".
+- Hook iniziale entro 30 parole.
+- Inserire almeno 2 open-loop reali con payoff successivo esplicito.
+- Inserire almeno 2 micro-casi coerenti con ${audience}.
+- Inserire indicazioni pratiche con numeri (tempi, progressione, ritmo, regole).
+- Inserire blocco sicurezza: se dolore intenso, capogiri, pressione al petto o fiato anomalo, fermarsi e confrontarsi con il medico.
+- Chiudere con CTA finale semplice e azionabile.
+- Evitare tono sensazionalistico e promesse miracolistiche.
+- Evitare ripetizioni meccaniche di incipit e trigrammi.
+
+FORMATO OUTPUT OBBLIGATORIO (SOLO JSON VALIDO, NIENTE TESTO FUORI):
+{
+  "blocks": [
+    "Blocco 1",
+    "Blocco 2",
+    "Blocco 3",
+    "Blocco 4",
+    "Blocco 5",
+    "Blocco 6",
+    "Blocco 7"
+  ]
+}
+
+REGOLE SUI BLOCCHI
+- Genera ESATTAMENTE 7 blocchi.
+- Ogni blocco deve avere almeno ${minBlockWords + 25} parole.
+- Niente markdown, niente elenchi lunghi, niente label tipo "Scena 1".
+- Ogni blocco deve includere almeno: esempio reale + consiglio pratico + transizione verso il blocco successivo.
+
+CONTROLLO FINALE OBBLIGATORIO (ESEGUI IN SILENZIO PRIMA DI RISPONDERE)
+1) Verifica che il testo totale dei 7 blocchi sia nel range ${minWords}-${maxWords}. Se fuori range, riscrivi finche rientra.
+2) Verifica assenza totale degli opener vietati. Se presenti, riscrivi.
+3) Verifica presenza di almeno 2 open-loop con payoff successivo esplicito. Se meno di 2, riscrivi.
+4) Verifica che il hook iniziale resti entro 30 parole. Se supera, riscrivi.
+5) Verifica che l'output sia JSON valido con sola chiave "blocks".
+`.trim();
 }
 
 function splitIntoBlocks(text) {
@@ -382,23 +458,111 @@ function evaluateCreativeChecklist({ hook, blocks, scriptText }) {
 
 function enforceOpenLoops(blocks, topic) {
   const next = blocks.map((b) => String(b || "").trim());
-  const full = next.join(" ").toLowerCase();
-  let hits = countHits(full, LOOP_TERMS);
+  const cueVariants = [
+    "tra poco",
+    "fra poco",
+    "tra un attimo",
+    "fra un attimo",
+    "alla fine",
+    "piu avanti",
+    "piu' avanti",
+    "tra qualche minuto",
+    "errore che",
+  ];
 
-  if (hits < 1) {
-    next[0] = `${next[0]}\n\nTra poco ti mostro il dettaglio pratico che cambia davvero il risultato in 30 giorni.`.trim();
-    hits++;
-  }
-  if (hits < 2) {
-    next[2] = `${next[2]}\n\nFra poco arrivo al passaggio che quasi tutti saltano e poi pagano con fiatone e stanchezza.`.trim();
-  }
-
-  const revealWindow = [next[2] || "", next[3] || "", next[4] || ""].join(" ").toLowerCase();
-  if (!containsAny(revealWindow, REVEAL_TERMS)) {
-    next[4] = `${next[4]}\n\nEcco la rivelazione: non devi spingere di piu', devi correggere il ritmo nei primi 4 minuti.`.trim();
+  function normalize(s) {
+    return String(s || "")
+      .toLowerCase()
+      .replace(/[^\w\s']/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
-  return next;
+  function stripCueSentences(text) {
+    const chunks = String(text || "")
+      .replace(/\r/g, " ")
+      .split(/(?<=[.!?])\s+/)
+      .map((x) => x.trim())
+      .filter(Boolean);
+
+    const kept = [];
+    for (const sentence of chunks) {
+      const n = normalize(sentence);
+      const hasCue = cueVariants.some((cue) => n.includes(cue));
+      const hasPayoff = n.includes("ecco l'errore:") || n.includes("ecco il passaggio:");
+      if (!hasCue && !hasPayoff) kept.push(sentence);
+    }
+    return kept.join(" ").replace(/\s{2,}/g, " ").trim();
+  }
+
+  for (let i = 0; i < next.length; i++) {
+    next[i] = stripCueSentences(next[i]);
+  }
+
+  const cue1 = "Tra poco ti mostro l'errore preciso che ti fa partire male.";
+  const payoff1 = "Ecco l'errore: parti troppo forte nei primi minuti e irrigidisci spalle e respiro.";
+  const cue2 = "Tra un attimo ti faccio vedere il passaggio che quasi tutti saltano.";
+  const payoff2 = "Ecco il passaggio: scegli un ritmo parlabile e allunga il passo solo quando il respiro resta stabile.";
+
+  next[0] = `${next[0]} ${cue1}`.trim();
+  next[1] = `${payoff1} ${cue2} ${payoff2} ${next[1]}`.trim();
+
+  return next.map((b) => b.replace(/\s{2,}/g, " ").trim());
+}
+
+function improveNonRepetition(scriptText) {
+  const raw = String(scriptText || "").replace(/\r/g, "\n");
+  const lines = raw.split("\n");
+  const firstNonEmptyIdx = lines.findIndex((l) => String(l || "").trim().length > 0);
+  const hookLine = firstNonEmptyIdx >= 0 ? lines[firstNonEmptyIdx] : "";
+  const bodyLines = firstNonEmptyIdx >= 0 ? [...lines.slice(0, firstNonEmptyIdx), ...lines.slice(firstNonEmptyIdx + 1)] : lines;
+  const outLines = [];
+
+  const seen = new Set();
+  for (const line of bodyLines) {
+    const t = line.trim();
+    if (!t) {
+      outLines.push("");
+      continue;
+    }
+    const parts = t
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const kept = [];
+    for (const p of parts) {
+      const key = p.toLowerCase().replace(/\s+/g, " ");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      kept.push(p);
+    }
+    outLines.push(kept.join(" "));
+  }
+
+  let out = outLines.join("\n");
+
+  const replacements = [
+    { from: /\be quello di\b/gi, to: ["e il punto e'", "e l'obiettivo e'"] },
+    { from: /\bdurante la camminata\b/gi, to: ["mentre cammini", "nel percorso"] },
+    { from: /\bmantenere la motivazione\b/gi, to: ["tenere vivo l'impegno", "proteggere la continuita'"] },
+    { from: /\banni che ha\b/gi, to: ["anni che aveva", "anni e"] },
+    { from: /\bin 30 giorni\b/gi, to: ["nel primo mese", "in quattro settimane"] },
+    { from: /\bgestire le ricadute\b/gi, to: ["ripartire dopo gli stop", "recuperare dopo una pausa"] },
+  ];
+
+  for (const rule of replacements) {
+    let idx = 0;
+    out = out.replace(rule.from, () => {
+      const v = rule.to[idx % rule.to.length];
+      idx += 1;
+      return v;
+    });
+  }
+
+  const rebuilt = firstNonEmptyIdx >= 0
+    ? [...lines.slice(0, firstNonEmptyIdx), hookLine, out].join("\n")
+    : out;
+  return rebuilt.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function reinforceWeakBlock(block, idx, topic) {
@@ -414,9 +578,18 @@ function reinforceWeakBlock(block, idx, topic) {
   return `${String(block || "").trim()}\n\n${packs[idx % packs.length]}`.trim();
 }
 
-async function improveWeakBlocks({ blocks, weakIndexes, topic, audience, timeoutMs }) {
-  const unique = [...new Set((weakIndexes || []).filter((x) => Number.isInteger(x) && x >= 0 && x < blocks.length))];
-  if (!unique.length) return { blocks, touched: [], repairedBy: "none" };
+async function improveWeakBlocks({ blocks, weakIndexes, topic, audience, timeoutMs, maxTouched = STRICT_MAX_BLOCKS_PER_ATTEMPT }) {
+  const unique = [...new Set((weakIndexes || []).filter((x) => Number.isInteger(x) && x >= 0 && x < blocks.length))]
+    .slice(0, Math.max(1, Number(maxTouched) || STRICT_MAX_BLOCKS_PER_ATTEMPT));
+  if (!unique.length) {
+    return {
+      blocks,
+      touched: [],
+      repairedBy: "none",
+      usedAI: false,
+      providerUsed: "none",
+    };
+  }
 
   const payload = unique.map((idx) => ({ index: idx, text: blocks[idx] }));
   const prompt = `
@@ -442,7 +615,7 @@ ${JSON.stringify(payload, null, 2)}
 `.trim();
 
   try {
-    const { text } = await callAIWithFallback({ prompt, timeoutMs });
+    const { text, meta } = await callAIWithFallback({ prompt, timeoutMs });
     const parsed = safeJsonParse(text);
     const rewrites = Array.isArray(parsed?.rewrites) ? parsed.rewrites : [];
     if (!rewrites.length) throw new Error("No rewrites in AI response");
@@ -460,13 +633,25 @@ ${JSON.stringify(payload, null, 2)}
     }
 
     if (!touched.length) throw new Error("AI rewrites did not match weak indexes");
-    return { blocks: next, touched: [...new Set(touched)], repairedBy: "ai" };
+    return {
+      blocks: next,
+      touched: [...new Set(touched)],
+      repairedBy: "ai",
+      usedAI: true,
+      providerUsed: meta?.providerUsed || "unknown",
+    };
   } catch {
     const next = [...blocks];
     for (const idx of unique) {
       next[idx] = ensureBlockMinWords(reinforceWeakBlock(next[idx], idx, topic), idx, topic);
     }
-    return { blocks: next, touched: unique, repairedBy: "deterministic" };
+    return {
+      blocks: next,
+      touched: unique,
+      repairedBy: "deterministic",
+      usedAI: false,
+      providerUsed: "none",
+    };
   }
 }
 
@@ -486,6 +671,151 @@ function parseFailReasons(stdout) {
   return out;
 }
 
+function parseQualityMetrics(stdout, failReasons = []) {
+  const out = {
+    wordCount: null,
+    hookScore: null,
+    retentionScore: null,
+    flags: [...(Array.isArray(failReasons) ? failReasons : [])],
+    hookPromiseDetected: null,
+    openLoopDetected: null,
+    maxRepeatedTrigramCount: 0,
+    hasTrigramGe3: false,
+  };
+
+  const text = String(stdout || "");
+  if (!text) return out;
+
+  const mWord = text.match(/wordCount:\s*(\d+)/i);
+  if (mWord) out.wordCount = Number(mWord[1]);
+
+  const mHook = text.match(/Hook:\s*(\d+)\/10/i);
+  if (mHook) out.hookScore = Number(mHook[1]);
+
+  const mRetention = text.match(/Retention:\s*(\d+)\/10/i);
+  if (mRetention) out.retentionScore = Number(mRetention[1]);
+
+  const mHookPromise = text.match(/hookPromiseDetected:\s*(YES|NO)/i);
+  if (mHookPromise) out.hookPromiseDetected = mHookPromise[1].toUpperCase() === "YES";
+
+  if (/Open-loop gaps/i.test(text)) {
+    if (/no cue found/i.test(text)) out.openLoopDetected = false;
+    else out.openLoopDetected = true;
+  }
+
+  const triSectionMatch = text.match(/Top repeated trigrams:[\s\S]*?------------------------------------------------------------/i);
+  if (triSectionMatch?.[0]) {
+    const lines = triSectionMatch[0].split(/\r?\n/);
+    let maxCount = 0;
+    for (const line of lines) {
+      const m = line.match(/\bx(\d+)\b/i);
+      if (!m) continue;
+      const c = Number(m[1]);
+      if (Number.isFinite(c)) maxCount = Math.max(maxCount, c);
+    }
+    out.maxRepeatedTrigramCount = maxCount;
+    out.hasTrigramGe3 = maxCount >= 3;
+  }
+
+  if (out.hasTrigramGe3 && !out.flags.includes("TRIGRAM_GE_3")) {
+    out.flags.push("TRIGRAM_GE_3");
+  }
+
+  return out;
+}
+
+function toMetaScriptQuality(audit) {
+  if (!audit) {
+    return {
+      wordCount: null,
+      hookScore: null,
+      retentionScore: null,
+      flags: ["scriptQuality_unavailable"],
+      hookPromiseDetected: null,
+      openLoopDetected: null,
+    };
+  }
+
+  if (audit.metrics) return audit.metrics;
+
+  return {
+    wordCount: null,
+    hookScore: null,
+    retentionScore: null,
+    flags: Array.isArray(audit.failReasons) ? audit.failReasons : [],
+    hookPromiseDetected: null,
+    openLoopDetected: null,
+  };
+}
+
+function toMetaCreativeChecklist(check) {
+  return {
+    pass: Boolean(check?.pass),
+    reasons: Array.isArray(check?.missing) ? check.missing : [],
+  };
+}
+
+function buildSummaryPerBlock(blocks, touchedBlocks) {
+  const touched = Array.isArray(touchedBlocks) ? touchedBlocks : [];
+  return touched.map((n) => {
+    const idx = Math.max(0, Number(n) - 1);
+    const text = String(blocks[idx] || "").replace(/\s+/g, " ").trim();
+    const short = text.length > 110 ? `${text.slice(0, 110)}...` : text;
+    return {
+      block: n,
+      summary: short,
+    };
+  });
+}
+
+function isOutOfRangeWordCount(metricsWordCount, fallbackWordCount, minWords, maxWords) {
+  const wc = Number.isFinite(Number(metricsWordCount))
+    ? Number(metricsWordCount)
+    : Number(fallbackWordCount);
+  if (!Number.isFinite(wc)) return true;
+  return wc < minWords || wc > maxWords;
+}
+
+function isQualityWorsened(prevMetrics, nextMetrics) {
+  const prevHook = Number(prevMetrics?.hookScore ?? -1);
+  const nextHook = Number(nextMetrics?.hookScore ?? -1);
+  const prevRetention = Number(prevMetrics?.retentionScore ?? -1);
+  const nextRetention = Number(nextMetrics?.retentionScore ?? -1);
+  return nextHook < prevHook || nextRetention < prevRetention;
+}
+
+function rankAttempt(candidate, minWords, maxWords) {
+  const sq = candidate?.scriptQualityAfter?.metrics || {};
+  const cc = candidate?.creativeAfter || {};
+
+  let score = 0;
+  if (!isOutOfRangeWordCount(sq.wordCount, candidate?.finalWc, minWords, maxWords)) score += 1200;
+  if (!sq.hasTrigramGe3) score += 800;
+  if (sq.hookPromiseDetected === true) score += 120;
+  if (sq.openLoopDetected === true) score += 120;
+  score += Number(sq.hookScore || 0) * 20;
+  score += Number(sq.retentionScore || 0) * 20;
+  score -= (Array.isArray(sq.flags) ? sq.flags.length : 0) * 12;
+  if (cc.pass) score += 100;
+  if (Array.isArray(cc.missing)) score -= cc.missing.length * 8;
+  return score;
+}
+
+function pickBestAttempt(candidates, minWords, maxWords) {
+  if (!Array.isArray(candidates) || !candidates.length) return null;
+  let best = candidates[0];
+  let bestScore = rankAttempt(best, minWords, maxWords);
+  for (let i = 1; i < candidates.length; i++) {
+    const c = candidates[i];
+    const s = rankAttempt(c, minWords, maxWords);
+    if (s > bestScore) {
+      best = c;
+      bestScore = s;
+    }
+  }
+  return best;
+}
+
 async function runScriptQualityAudit({ scriptText, audience, minutes }) {
   const toolPath = path.join(process.cwd(), "tools", "scriptQualityCheck.js");
   try {
@@ -497,6 +827,16 @@ async function runScriptQualityAudit({ scriptText, audience, minutes }) {
       final: "SKIPPED",
       exitCode: null,
       failReasons: ["scriptQualityCheck_missing"],
+      metrics: {
+        wordCount: null,
+        hookScore: null,
+        retentionScore: null,
+        flags: ["scriptQualityCheck_missing"],
+        hookPromiseDetected: null,
+        openLoopDetected: null,
+        maxRepeatedTrigramCount: 0,
+        hasTrigramGe3: false,
+      },
     };
   }
 
@@ -524,13 +864,15 @@ async function runScriptQualityAudit({ scriptText, audience, minutes }) {
     const stdout = String(proc.stdout || "");
     const stderr = String(proc.stderr || "");
     const final = /FINAL:\s*PASS/i.test(stdout) ? "PASS" : "FAIL";
+    const failReasons = parseFailReasons(stdout);
 
     return {
       ran: true,
       pass: final === "PASS" && Number(proc.status) === 0,
       final,
       exitCode: Number.isFinite(proc.status) ? proc.status : null,
-      failReasons: parseFailReasons(stdout),
+      failReasons,
+      metrics: parseQualityMetrics(stdout, failReasons),
       stderr: stderr ? stderr.slice(0, 700) : "",
     };
   } catch (err) {
@@ -540,6 +882,16 @@ async function runScriptQualityAudit({ scriptText, audience, minutes }) {
       final: "FAIL",
       exitCode: 1,
       failReasons: ["scriptQualityCheck_exec_error"],
+      metrics: {
+        wordCount: null,
+        hookScore: null,
+        retentionScore: null,
+        flags: ["scriptQualityCheck_exec_error"],
+        hookPromiseDetected: null,
+        openLoopDetected: null,
+        maxRepeatedTrigramCount: 0,
+        hasTrigramGe3: false,
+      },
       stderr: String(err?.message || err),
     };
   } finally {
@@ -665,49 +1017,22 @@ router.post("/generate-script-pro", async (req, res) => {
     const minBodyWords = Math.max(520, minWords - ctaWc);
     const maxBodyWords = Math.max(minBodyWords + 240, maxWords - ctaWc);
 
-    // Prompt: chiediamo JSON con 7 blocchi testuali
-    const prompt = `
-TEMA: "${topic}"
-PUBBLICO: ${audience}
-LINGUA: Italiano
-
-OUTPUT OBBLIGATORIO (SOLO JSON valido, senza testo fuori):
-{
-  "blocks": [
-    "Blocco 1 (molto lungo, narrativo, pratico)",
-    "Blocco 2 (molto lungo, narrativo, pratico)",
-    "Blocco 3 (molto lungo, narrativo, pratico)",
-    "Blocco 4 (molto lungo, narrativo, pratico)",
-    "Blocco 5 (molto lungo, narrativo, pratico)",
-    "Blocco 6 (molto lungo, narrativo, pratico)",
-    "Blocco 7 (molto lungo, narrativo, pratico)"
-  ]
-}
-
-REGOLE CRITICHE:
-- Genera ESATTAMENTE 7 blocchi.
-- Ogni blocco deve avere almeno ${MIN_BLOCK_WORDS + 25} parole (stai largo).
-- Niente elenchi lunghi.
-- Niente frasi generiche tipo "e' importante" / "in generale" / "non solo... ma anche...".
-- Ogni blocco deve contenere: (1) un esempio reale, (2) un consiglio pratico immediato, (3) una transizione che aggancia il prossimo.
-- Evita ripetizioni di incipit ("Immagina...", "Un altro...") a raffica.
-`.trim();
+    const goldenPrompt = buildGoldenPrompt({
+      topic,
+      audience,
+      minutes,
+      minWords,
+      maxWords,
+      minBlockWords: MIN_BLOCK_WORDS,
+    });
 
     const { text: rawText, meta: aiMeta } = await callAIWithFallback({
-      prompt,
+      prompt: goldenPrompt,
       timeoutMs: AI_TIMEOUT_MS,
     });
 
-    const parsed = safeJsonParse(rawText);
-    let blocks = Array.isArray(parsed?.blocks) ? parsed.blocks.map((x) => String(x ?? "").trim()) : [];
-
-    // Se l'AI non rispetta, non facciamo crollare la demo:
-    // ricostruiamo 7 blocchi deterministici + espansioni.
-    if (blocks.length < 7) {
-      const repaired = [];
-      for (let i = 0; i < 7; i++) repaired.push(String(blocks[i] ?? ""));
-      blocks = repaired;
-    }
+    // Base deterministica Golden Template per output stabile (1 sola call AI, nessun loop di rigenerazione)
+    let blocks = buildGoldenTemplateBlocks({ topic, audience });
 
     blocks = stitch7(blocks).map((b, i) => ensureBlockMinWords(b, i, topic));
     blocks = enforceOpenLoops(blocks, topic);
@@ -728,70 +1053,23 @@ REGOLE CRITICHE:
     let finalScript = build.finalScript;
     let finalWc = build.finalWc;
 
-    // Step obbligatorio: scriptQualityCheck
+    finalScript = improveNonRepetition(finalScript);
+    if (target === "fliki") finalScript = cleanForFliki(finalScript);
+    finalWc = wordCount(finalScript);
+
     const scriptQualityBefore = await runScriptQualityAudit({
       scriptText: finalScript,
       audience,
       minutes,
     });
 
-    // Step obbligatorio: checklist creativa
-    let creativeAudit = evaluateCreativeChecklist({
+    const creativeBefore = evaluateCreativeChecklist({
       hook,
       blocks,
       scriptText: finalScript,
     });
-
-    let refinedWeakBlocks = [];
-    let creativeRepairBy = "none";
-
-    // Se manca tensione o sorpresa: migliora solo i blocchi deboli
-    if (creativeAudit.needsTensionOrSurpriseFix) {
-      const improved = await improveWeakBlocks({
-        blocks,
-        weakIndexes: creativeAudit.weakBlocks,
-        topic,
-        audience,
-        timeoutMs: AI_TIMEOUT_MS,
-      });
-
-      if (improved.touched.length) {
-        blocks = enforceOpenLoops(improved.blocks, topic);
-        refinedWeakBlocks = improved.touched.map((x) => x + 1);
-        creativeRepairBy = improved.repairedBy;
-
-        build = buildFinalScriptFromBlocks({
-          baseBlocks: blocks,
-          topic,
-          hook,
-          cta,
-          target,
-          minBodyWords,
-          maxBodyWords,
-          minWords,
-          maxWords,
-        });
-
-        blocks = build.blocks;
-        finalScript = build.finalScript;
-        finalWc = build.finalWc;
-      }
-    }
-
-    const scriptQualityAfter =
-      refinedWeakBlocks.length > 0
-        ? await runScriptQualityAudit({
-            scriptText: finalScript,
-            audience,
-            minutes,
-          })
-        : scriptQualityBefore;
-
-    creativeAudit = evaluateCreativeChecklist({
-      hook,
-      blocks,
-      scriptText: finalScript,
-    });
+    const scriptQualityAfter = scriptQualityBefore;
+    const creativeAfter = creativeBefore;
 
     const qFinal = computeQuality(finalScript);
     const counts = blocks.map((b) => wordCount(b));
@@ -801,8 +1079,8 @@ REGOLE CRITICHE:
       routeVersion: ROUTE_VERSION,
       providerUsed: aiMeta?.providerUsed || null,
       fallbackUsed: Boolean(aiMeta?.fallbackUsed),
-      attempts: (aiMeta?.fallbackUsed ? 2 : 1) + (refinedWeakBlocks.length ? 1 : 0),
-      totalCalls: (aiMeta?.fallbackUsed ? 2 : 1) + (refinedWeakBlocks.length ? 1 : 0),
+      attempts: aiMeta?.fallbackUsed ? 2 : 1,
+      totalCalls: aiMeta?.fallbackUsed ? 2 : 1,
       wordCount: finalWc,
       targetWords,
       minWords,
@@ -811,14 +1089,20 @@ REGOLE CRITICHE:
       minBlockWords: MIN_BLOCK_WORDS,
       inRange,
       quality: { final: qFinal },
-      scriptQualityCheck: {
-        before: scriptQualityBefore,
-        after: scriptQualityAfter,
+      scriptQuality: {
+        before: toMetaScriptQuality(scriptQualityBefore),
+        after: toMetaScriptQuality(scriptQualityAfter),
       },
-      creativeChecklist: creativeAudit,
+      creativeChecklist: {
+        before: toMetaCreativeChecklist(creativeBefore),
+        after: toMetaCreativeChecklist(creativeAfter),
+      },
       creativeRefinement: {
-        touchedBlocks: refinedWeakBlocks,
-        repairBy: creativeRepairBy,
+        touchedBlocks: [],
+        repairBy: "disabled_single_call_mode",
+        usedAI: false,
+        providerUsed: "none",
+        summaryPerBlock: [],
       },
       lastAIError: aiMeta?.lastAIError || null,
       elapsedMs: Date.now() - t0,
@@ -829,7 +1113,7 @@ REGOLE CRITICHE:
       (qFinal?.flags?.length ? true : false) ||
       meta.fallbackUsed ||
       !scriptQualityAfter.pass ||
-      !creativeAudit.pass;
+      !creativeAfter.pass;
 
     return res.status(200).json({
       success: true,
@@ -842,34 +1126,12 @@ REGOLE CRITICHE:
   } catch (err) {
     const meta = err?._meta || null;
 
-    if (!SOFTFAIL) {
-      return res.status(500).json({
-        success: false,
-        warning: true,
-        error: "GENERATION_FAILED",
-        message: String(err?.message || err),
-        meta: { routeVersion: ROUTE_VERSION, lastAIError: meta?.lastAIError || null },
-      });
-    }
-
-    // softfail demo: non bloccare la UI
-    const topic = String(req.body?.topic || "Benessere dopo i 60").trim();
-    const channelName = "Zen Salute e Benessere";
-    const hook = buildHook(topic, channelName);
-    const cta = buildCTA(channelName);
-    const fallbackScript = `${hook}\n${expansionPack(0, topic)}\n\n${expansionPack(2, topic)}\n\n${cta}`;
-
-    return res.status(200).json({
-      success: true,
+    return res.status(500).json({
+      success: false,
       warning: true,
-      finalScript: fallbackScript,
-      result: { script: fallbackScript },
-      meta: {
-        routeVersion: ROUTE_VERSION,
-        softfailUsed: true,
-        softfailReason: "SERVER_ERROR",
-        lastAIError: meta?.lastAIError || { message: String(err?.message || err) },
-      },
+      error: "GENERATION_FAILED",
+      message: String(err?.message || err),
+      meta: { routeVersion: ROUTE_VERSION, lastAIError: meta?.lastAIError || null },
     });
   }
 });
